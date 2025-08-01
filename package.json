@@ -24,6 +24,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@tailwindcss/line-clamp": "^0.4.4",
     "autoprefixer": "^10.4.19",
     "eslint": "^8",
     "eslint-config-next": "13.5.6",
