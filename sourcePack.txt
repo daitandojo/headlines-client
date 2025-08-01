@@ -1,0 +1,1302 @@
+
+# File: .gitignore
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+favicon.ico
+
+
+# File: components.json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": false,
+  "tailwind": {
+    "config": "",
+    "css": "src/app/globals.css",
+    "baseColor": "stone",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "iconLibrary": "lucide"
+}
+
+# File: eslint.config.mjs
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+import { FlatCompat } from "@eslint/eslintrc";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+});
+
+const eslintConfig = [...compat.extends("next/core-web-vitals")];
+
+export default eslintConfig;
+
+
+# File: jsconfig.json
+{
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
+
+
+# File: next.config.js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // This block is what you need to add.
+  experimental: {
+    serverActions: true,
+  },
+};
+
+module.exports = nextConfig;
+
+# File: package.json
+{
+  "name": "headlines-client",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@radix-ui/react-accordion": "^1.1.2",
+    "@radix-ui/react-label": "^2.0.2",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-slot": "^1.0.2",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.379.0",
+    "mongoose": "^8.4.0",
+    "next": "13.5.6",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "tailwind-merge": "^2.3.0",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "eslint": "^8",
+    "eslint-config-next": "13.5.6",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1"
+  }
+}
+
+
+# File: postcss.config.mjs
+const config = {
+  plugins: ["@tailwindcss/postcss"],
+};
+
+export default config;
+
+
+# File: src/actions/articles.js
+"use server";
+
+import dbConnect from "@/lib/mongodb";
+import Article from "@/models/Article";
+import { revalidatePath } from "next/cache";
+
+export async function deleteArticle(articleId) {
+  if (!articleId) {
+    return { success: false, message: "Article ID is required." };
+  }
+
+  try {
+    await dbConnect();
+    const result = await Article.findByIdAndDelete(articleId);
+
+    if (!result) {
+      return { success: false, message: "Article not found." };
+    }
+
+    // Invalidate the cache for the home page, forcing a data refetch on next visit.
+    revalidatePath("/");
+    return { success: true, message: "Article deleted successfully." };
+
+  } catch (error) {
+    console.error("Delete Article Error:", error);
+    return { success: false, message: "Failed to delete article." };
+  }
+}
+
+# File: src/app/globals.css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 224 71.4% 4.1%;
+    --foreground: 210 20% 98%;
+    --card: 224 71.4% 4.1%;
+    --card-foreground: 210 20% 98%;
+    --popover: 224 71.4% 4.1%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 210 20% 98%;
+    --primary-foreground: 220.9 39.3% 11%;
+    --secondary: 222.2 47.4% 11.2%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 215 27.9% 16.9%;
+    --muted-foreground: 217.9 10.6% 64.9%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 20% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 85.7% 97.3%;
+    --border: 215 27.9% 16.9%;
+    --input: 215 27.9% 16.9%;
+    --ring: 217 91% 60%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Re-define for dark mode, though they are the same in our case */
+    --background: 224 71.4% 4.1%;
+    --foreground: 210 20% 98%;
+    --card: 224 71.4% 4.1%;
+    --card-foreground: 210 20% 98%;
+    --popover: 224 71.4% 4.1%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 210 20% 98%;
+    --primary-foreground: 220.9 39.3% 11%;
+    --secondary: 222.2 47.4% 11.2%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 215 27.9% 16.9%;
+    --muted-foreground: 217.9 10.6% 64.9%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 20% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 85.7% 97.3%;
+    --border: 215 27.9% 16.9%;
+    --input: 215 27.9% 16.9%;
+    --ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    background-image: radial-gradient(
+        at 27% 37%,
+        hsla(215, 98%, 43%, 0.15) 0px,
+        transparent 50%
+      ),
+      radial-gradient(
+        at 97% 21%,
+        hsla(217, 91%, 60%, 0.1) 0px,
+        transparent 50%
+      ),
+      radial-gradient(
+        at 52% 99%,
+        hsla(355, 98%, 51%, 0.1) 0px,
+        transparent 50%
+      );
+  }
+}
+
+# File: src/app/layout.js
+import { Inter } from "next/font/google";
+// CRITICAL FIX: Import the global CSS file that defines the entire theme.
+import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const fontSans = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+export const metadata = {
+  title: "Headlines Intelligence Client",
+  description: "An interface to browse, search, and filter wealth event articles.",
+};
+
+export default function RootLayout({ children }) {
+  // CRITICAL FIX: Apply the "dark" class to the <html> tag.
+  return (
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body
+        className={cn(
+          "min-h-screen font-sans antialiased",
+          fontSans.variable
+        )}
+      >
+        {children}
+      </body>
+    </html>
+  );
+}
+
+# File: src/app/page.js
+import { Suspense } from 'react';
+import { Header } from '@/components/Header';
+import { ArticlesView } from '@/components/ArticlesView';
+
+export default function HomePage({ searchParams }) {
+  return (
+    <div className="container mx-auto p-4 md:p-8">
+      <Header />
+      <Suspense fallback={<div className="text-center text-slate-400 p-10">Loading Intelligence...</div>}>
+        <ArticlesView searchParams={searchParams} />
+      </Suspense>
+    </div>
+  );
+}
+
+# File: src/components/ArticleCard.jsx
+"use client";
+
+import { useTransition } from "react";
+import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Trash2, ExternalLink } from "lucide-react";
+import { deleteArticle } from "@/actions/articles";
+
+const getRelevanceBadgeClass = (score) => {
+  if (score >= 90) return "bg-red-500/20 text-red-300 border border-red-500/30 shadow-lg shadow-red-500/10";
+  if (score >= 75) return "bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-lg shadow-blue-500/10";
+  return "bg-slate-500/20 text-slate-300 border border-slate-500/30";
+};
+
+export const ArticleCard = ({ article }) => {
+  const [isPending, startTransition] = useTransition();
+
+  const handleDelete = () => {
+    if (confirm("Are you sure you want to permanently delete this article?")) {
+      startTransition(() => {
+        deleteArticle(article._id).catch(err => alert("Deletion failed."));
+      });
+    }
+  };
+
+  return (
+    <AccordionItem value={article._id} className="border-b-0 rounded-lg bg-black/20 backdrop-blur-sm border border-white/10 transition-all hover:border-white/20">
+      <div className="flex items-center justify-between p-4">
+        <AccordionTrigger className="flex-grow p-0 hover:no-underline text-left">
+          <div className="flex items-center gap-4 w-full">
+            <Badge className={`text-base font-bold px-3 py-1 shrink-0 ${getRelevanceBadgeClass(article.relevance_article)}`}>
+              {article.relevance_article}
+            </Badge>
+            <div className="flex-grow min-w-0">
+              <p className="font-semibold text-lg text-slate-100 truncate">
+                {article.headline}
+              </p>
+              <p className="text-sm text-slate-400 mt-1">{article.newspaper}</p>
+            </div>
+          </div>
+        </AccordionTrigger>
+
+        <div className="flex items-center gap-2 shrink-0 ml-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => window.open(article.link, '_blank')}
+            className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10"
+            title="Open in new tab"
+          >
+            <ExternalLink className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleDelete}
+            disabled={isPending}
+            className="text-slate-400 hover:text-red-400 hover:bg-red-500/10"
+            title="Delete article"
+          >
+            <Trash2 className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
+      
+      <AccordionContent className="p-6 pt-0">
+        <div className="border-t border-slate-700/50 pt-6 space-y-6">
+          <div>
+            <h4 className="font-semibold text-md text-slate-300 mb-2">AI Assessment</h4>
+            <p className="text-slate-400 italic">"{article.assessment_article}"</p>
+          </div>
+          <div className="max-h-60 overflow-y-auto pr-4">
+            <h4 className="font-semibold text-md text-slate-300 mb-2">Article Content</h4>
+            <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">
+              {article.articleContent.contents.join('\n\n')}
+            </p>
+          </div>
+          {article.key_individuals && article.key_individuals.length > 0 && (
+            <div>
+              <h4 className="font-semibold text-md text-slate-300 mb-2">Key Individuals & Contacts</h4>
+              <ul className="list-disc list-inside text-slate-400">
+                {article.key_individuals.map(person => (
+                  <li key={person.name}>
+                    <strong>{person.name}</strong> ({person.role_in_event} at {person.company})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </AccordionContent>
+    </AccordionItem>
+  );
+};
+
+# File: src/components/ArticleList.jsx
+import { Accordion } from '@/components/ui/accordion';
+import { ArticleCard } from '@/components/ArticleCard';
+
+export const ArticleList = ({ articles }) => {
+  return (
+    <Accordion type="single" collapsible className="w-full space-y-2">
+      {articles.map((article) => (
+        <ArticleCard key={article._id} article={article} />
+      ))}
+    </Accordion>
+  );
+};
+
+# File: src/components/ArticlesView.jsx
+import dbConnect from '@/lib/mongodb';
+import Article from '@/models/Article';
+import { Filters } from '@/components/Filters';
+import { ArticleList } from '@/components/ArticleList';
+import { PaginationControls } from '@/components/PaginationControls';
+
+const ARTICLES_PER_PAGE = 10;
+
+export async function ArticlesView({ searchParams }) {
+  const page = parseInt(searchParams.page) || 1;
+  const searchTerm = searchParams.q || '';
+  const sourceFilter = searchParams.source || 'all';
+  const sortOption = searchParams.sort || 'relevance_desc';
+
+  await dbConnect();
+
+  const queryFilter = {};
+  if (searchTerm) {
+    const searchRegex = { $regex: searchTerm, $options: 'i' };
+    queryFilter.$or = [
+      { headline: searchRegex },
+      { assessment_article: searchRegex },
+      { 'articleContent.contents': searchRegex },
+    ];
+  }
+  if (sourceFilter && sourceFilter !== 'all') {
+    queryFilter.newspaper = sourceFilter;
+  }
+
+  let sort = {};
+  switch (sortOption) {
+    case 'relevance_asc': sort = { relevance_article: 1 }; break;
+    case 'date_desc': sort = { createdAt: -1 }; break;
+    case 'date_asc': sort = { createdAt: 1 }; break;
+    case 'relevance_desc':
+    default: sort = { relevance_article: -1 }; break;
+  }
+
+  const uniqueSourcesPromise = Article.distinct('newspaper');
+  const totalArticlesPromise = Article.countDocuments(queryFilter);
+  const articlesPromise = Article.find(queryFilter)
+    .sort(sort)
+    .skip((page - 1) * ARTICLES_PER_PAGE)
+    .limit(ARTICLES_PER_PAGE)
+    .lean();
+
+  const [uniqueSources, totalArticles, articles] = await Promise.all([
+    uniqueSourcesPromise,
+    totalArticlesPromise,
+    articlesPromise,
+  ]);
+
+  const totalPages = Math.ceil(totalArticles / ARTICLES_PER_PAGE);
+
+  return (
+    <div className="space-y-6">
+      <div className="p-6 rounded-lg bg-black/20 backdrop-blur-sm border border-white/10">
+        <Filters uniqueSources={['all', ...uniqueSources]} searchParams={searchParams} />
+      </div>
+
+      <div>
+        <h2 className="text-xl font-medium text-slate-300 mb-4">
+          Displaying {articles.length} of {totalArticles} articles
+        </h2>
+        {articles.length > 0 ? (
+          <ArticleList articles={JSON.parse(JSON.stringify(articles))} />
+        ) : (
+          <div className="text-center text-gray-500 py-20 rounded-lg bg-black/20 border border-white/10">
+            <p>No articles found matching your criteria.</p>
+          </div>
+        )}
+      </div>
+      
+      {totalPages > 1 && (
+        <PaginationControls totalPages={totalPages} currentPage={page} />
+      )}
+    </div>
+  );
+}
+
+# File: src/components/Filters.jsx
+'use client';
+
+import { usePathname, useRouter } from 'next/navigation';
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export const Filters = ({ uniqueSources, searchParams }) => {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleFilterChange = (key, value) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value && value !== 'all') {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    params.set('page', '1');
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+      <div className="space-y-2">
+        <Label htmlFor="search" className="text-slate-300">Search Headlines & Content</Label>
+        <Input
+          id="search"
+          type="text"
+          placeholder="e.g., 'acquisition' or 'Povlsen'..."
+          defaultValue={searchParams.q || ''}
+          onChange={(e) => handleFilterChange('q', e.target.value)}
+          className="bg-slate-900/80 border-slate-700 ring-offset-background focus-visible:ring-ring"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="source" className="text-slate-300">Filter by Source</Label>
+        <Select
+          defaultValue={searchParams.source || 'all'}
+          onValueChange={(value) => handleFilterChange('source', value)}
+        >
+          <SelectTrigger id="source" className="bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
+            <SelectValue placeholder="Select a source" />
+          </SelectTrigger>
+          <SelectContent>
+            {uniqueSources.map(source => (
+              <SelectItem key={source} value={source}>
+                {source === 'all' ? 'All Sources' : source}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="sort" className="text-slate-300">Sort By</Label>
+        <Select
+          defaultValue={searchParams.sort || 'relevance_desc'}
+          onValueChange={(value) => handleFilterChange('sort', value)}
+        >
+          <SelectTrigger id="sort" className="bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
+            <SelectValue placeholder="Select sorting" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="relevance_desc">Relevance (High to Low)</SelectItem>
+            <SelectItem value="relevance_asc">Relevance (Low to High)</SelectItem>
+            <SelectItem value="date_desc">Date (Newest First)</SelectItem>
+            <SelectItem value="date_asc">Date (Oldest First)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+};
+
+# File: src/components/Header.jsx
+import { Briefcase } from 'lucide-react';
+
+export const Header = () => {
+  return (
+    <header className="mb-12 text-center">
+      <div className="inline-block p-4 bg-slate-800/50 border border-slate-600 rounded-xl mb-6 shadow-2xl shadow-blue-500/20">
+        <Briefcase size={48} className="text-blue-400" />
+      </div>
+      <h1 className="text-5xl font-extrabold tracking-tight text-slate-50 sm:text-6xl">
+        Headlines Intelligence
+      </h1>
+      <p className="mt-6 text-lg text-slate-400 max-w-2xl mx-auto">
+        Search, filter, and analyze curated wealth event articles with AI-powered insights.
+      </p>
+    </header>
+  );
+};
+
+# File: src/components/PaginationControls.jsx
+'use client';
+
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Button } from "@/components/ui/button";
+
+export const PaginationControls = ({ totalPages, currentPage }) => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const handlePageChange = (newPage) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', newPage.toString());
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  return (
+    <div className="flex items-center justify-center mt-8 gap-4">
+      <Button
+        variant="secondary"
+        onClick={() => handlePageChange(currentPage - 1)}
+        disabled={currentPage <= 1}
+      >
+        Previous
+      </Button>
+      <span className="text-slate-400 font-medium">
+        Page {currentPage} of {totalPages}
+      </span>
+      <Button
+        variant="secondary"
+        onClick={() => handlePageChange(currentPage + 1)}
+        disabled={currentPage >= totalPages}
+      >
+        Next
+      </Button>
+    </div>
+  );
+};
+
+# File: src/components/ui/accordion.jsx
+"use client"
+
+import * as React from "react"
+import * as AccordionPrimitive from "@radix-ui/react-accordion"
+import { ChevronDownIcon } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+function Accordion({
+  ...props
+}) {
+  return <AccordionPrimitive.Root data-slot="accordion" {...props} />;
+}
+
+function AccordionItem({
+  className,
+  ...props
+}) {
+  return (
+    <AccordionPrimitive.Item
+      data-slot="accordion-item"
+      className={cn("border-b last:border-b-0", className)}
+      {...props} />
+  );
+}
+
+function AccordionTrigger({
+  className,
+  children,
+  ...props
+}) {
+  return (
+    <AccordionPrimitive.Header className="flex">
+      <AccordionPrimitive.Trigger
+        data-slot="accordion-trigger"
+        className={cn(
+          "focus-visible:border-ring focus-visible:ring-ring/50 flex flex-1 items-start justify-between gap-4 rounded-md py-4 text-left text-sm font-medium transition-all outline-none hover:underline focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 [&[data-state=open]>svg]:rotate-180",
+          className
+        )}
+        {...props}>
+        {children}
+        <ChevronDownIcon
+          className="text-muted-foreground pointer-events-none size-4 shrink-0 translate-y-0.5 transition-transform duration-200" />
+      </AccordionPrimitive.Trigger>
+    </AccordionPrimitive.Header>
+  );
+}
+
+function AccordionContent({
+  className,
+  children,
+  ...props
+}) {
+  return (
+    <AccordionPrimitive.Content
+      data-slot="accordion-content"
+      className="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden text-sm"
+      {...props}>
+      <div className={cn("pt-0 pb-4", className)}>{children}</div>
+    </AccordionPrimitive.Content>
+  );
+}
+
+export { Accordion, AccordionItem, AccordionTrigger, AccordionContent }
+
+
+# File: src/components/ui/badge.jsx
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva } from "class-variance-authority";
+
+import { cn } from "@/lib/utils"
+
+const badgeVariants = cva(
+  "inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
+  {
+    variants: {
+      variant: {
+        default:
+          "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
+        secondary:
+          "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
+        destructive:
+          "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+        outline:
+          "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+function Badge({
+  className,
+  variant,
+  asChild = false,
+  ...props
+}) {
+  const Comp = asChild ? Slot : "span"
+
+  return (
+    <Comp
+      data-slot="badge"
+      className={cn(badgeVariants({ variant }), className)}
+      {...props} />
+  );
+}
+
+export { Badge, badgeVariants }
+
+
+# File: src/components/ui/button.jsx
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva } from "class-variance-authority";
+
+import { cn } from "@/lib/utils"
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  {
+    variants: {
+      variant: {
+        default:
+          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+        outline:
+          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+        secondary:
+          "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
+        ghost:
+          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-9 px-4 py-2 has-[>svg]:px-3",
+        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
+        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
+        icon: "size-9",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
+function Button({
+  className,
+  variant,
+  size,
+  asChild = false,
+  ...props
+}) {
+  const Comp = asChild ? Slot : "button"
+
+  return (
+    <Comp
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props} />
+  );
+}
+
+export { Button, buttonVariants }
+
+
+# File: src/components/ui/card.jsx
+import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+function Card({
+  className,
+  ...props
+}) {
+  return (
+    <div
+      data-slot="card"
+      className={cn(
+        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        className
+      )}
+      {...props} />
+  );
+}
+
+function CardHeader({
+  className,
+  ...props
+}) {
+  return (
+    <div
+      data-slot="card-header"
+      className={cn(
+        "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
+        className
+      )}
+      {...props} />
+  );
+}
+
+function CardTitle({
+  className,
+  ...props
+}) {
+  return (
+    <div
+      data-slot="card-title"
+      className={cn("leading-none font-semibold", className)}
+      {...props} />
+  );
+}
+
+function CardDescription({
+  className,
+  ...props
+}) {
+  return (
+    <div
+      data-slot="card-description"
+      className={cn("text-muted-foreground text-sm", className)}
+      {...props} />
+  );
+}
+
+function CardAction({
+  className,
+  ...props
+}) {
+  return (
+    <div
+      data-slot="card-action"
+      className={cn(
+        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
+        className
+      )}
+      {...props} />
+  );
+}
+
+function CardContent({
+  className,
+  ...props
+}) {
+  return (<div data-slot="card-content" className={cn("px-6", className)} {...props} />);
+}
+
+function CardFooter({
+  className,
+  ...props
+}) {
+  return (
+    <div
+      data-slot="card-footer"
+      className={cn("flex items-center px-6 [.border-t]:pt-6", className)}
+      {...props} />
+  );
+}
+
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardAction,
+  CardDescription,
+  CardContent,
+}
+
+
+# File: src/components/ui/input.jsx
+import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+function Input({
+  className,
+  type,
+  ...props
+}) {
+  return (
+    <input
+      type={type}
+      data-slot="input"
+      className={cn(
+        "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+        className
+      )}
+      {...props} />
+  );
+}
+
+export { Input }
+
+
+# File: src/components/ui/label.jsx
+"use client"
+
+import * as React from "react"
+import * as LabelPrimitive from "@radix-ui/react-label"
+
+import { cn } from "@/lib/utils"
+
+function Label({
+  className,
+  ...props
+}) {
+  return (
+    <LabelPrimitive.Root
+      data-slot="label"
+      className={cn(
+        "flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
+        className
+      )}
+      {...props} />
+  );
+}
+
+export { Label }
+
+
+# File: src/components/ui/select.jsx
+"use client"
+
+import * as React from "react"
+import * as SelectPrimitive from "@radix-ui/react-select"
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+function Select({
+  ...props
+}) {
+  return <SelectPrimitive.Root data-slot="select" {...props} />;
+}
+
+function SelectGroup({
+  ...props
+}) {
+  return <SelectPrimitive.Group data-slot="select-group" {...props} />;
+}
+
+function SelectValue({
+  ...props
+}) {
+  return <SelectPrimitive.Value data-slot="select-value" {...props} />;
+}
+
+function SelectTrigger({
+  className,
+  size = "default",
+  children,
+  ...props
+}) {
+  return (
+    <SelectPrimitive.Trigger
+      data-slot="select-trigger"
+      data-size={size}
+      className={cn(
+        "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 flex w-fit items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}>
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <ChevronDownIcon className="size-4 opacity-50" />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  );
+}
+
+function SelectContent({
+  className,
+  children,
+  position = "popper",
+  ...props
+}) {
+  return (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Content
+        data-slot="select-content"
+        className={cn(
+          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border shadow-md",
+          position === "popper" &&
+            "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+          className
+        )}
+        position={position}
+        {...props}>
+        <SelectScrollUpButton />
+        <SelectPrimitive.Viewport
+          className={cn("p-1", position === "popper" &&
+            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1")}>
+          {children}
+        </SelectPrimitive.Viewport>
+        <SelectScrollDownButton />
+      </SelectPrimitive.Content>
+    </SelectPrimitive.Portal>
+  );
+}
+
+function SelectLabel({
+  className,
+  ...props
+}) {
+  return (
+    <SelectPrimitive.Label
+      data-slot="select-label"
+      className={cn("text-muted-foreground px-2 py-1.5 text-xs", className)}
+      {...props} />
+  );
+}
+
+function SelectItem({
+  className,
+  children,
+  ...props
+}) {
+  return (
+    <SelectPrimitive.Item
+      data-slot="select-item"
+      className={cn(
+        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+        className
+      )}
+      {...props}>
+      <span className="absolute right-2 flex size-3.5 items-center justify-center">
+        <SelectPrimitive.ItemIndicator>
+          <CheckIcon className="size-4" />
+        </SelectPrimitive.ItemIndicator>
+      </span>
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    </SelectPrimitive.Item>
+  );
+}
+
+function SelectSeparator({
+  className,
+  ...props
+}) {
+  return (
+    <SelectPrimitive.Separator
+      data-slot="select-separator"
+      className={cn("bg-border pointer-events-none -mx-1 my-1 h-px", className)}
+      {...props} />
+  );
+}
+
+function SelectScrollUpButton({
+  className,
+  ...props
+}) {
+  return (
+    <SelectPrimitive.ScrollUpButton
+      data-slot="select-scroll-up-button"
+      className={cn("flex cursor-default items-center justify-center py-1", className)}
+      {...props}>
+      <ChevronUpIcon className="size-4" />
+    </SelectPrimitive.ScrollUpButton>
+  );
+}
+
+function SelectScrollDownButton({
+  className,
+  ...props
+}) {
+  return (
+    <SelectPrimitive.ScrollDownButton
+      data-slot="select-scroll-down-button"
+      className={cn("flex cursor-default items-center justify-center py-1", className)}
+      {...props}>
+      <ChevronDownIcon className="size-4" />
+    </SelectPrimitive.ScrollDownButton>
+  );
+}
+
+export {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectScrollDownButton,
+  SelectScrollUpButton,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+}
+
+
+# File: src/lib/mongodb.js
+import mongoose from 'mongoose';
+
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+  throw new Error(
+    'Please define the MONGO_URI environment variable inside .env.local'
+  );
+}
+
+/**
+ * Global is used here to maintain a cached connection across hot reloads
+ * in development. This prevents connections from growing exponentially
+ * during API Route usage.
+ */
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+async function dbConnect() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+    };
+
+    cached.promise = mongoose.connect(MONGO_URI, opts).then((mongoose) => {
+      return mongoose;
+    });
+  }
+  
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
+
+  return cached.conn;
+}
+
+export default dbConnect;
+
+# File: src/lib/utils.js
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
+
+
+# File: src/models/Article.js
+import mongoose from 'mongoose';
+
+const { Schema, models, model } = mongoose;
+
+const ArticleSchema = new Schema(
+  {
+    headline: { type: String, required: true },
+    link: { type: String, required: true, unique: true },
+    newspaper: { type: String, required: true },
+    source: { type: String, required: true },
+    relevance_headline: { type: Number, required: true },
+    relevance_article: { type: Number },
+    assessment_article: { type: String },
+    articleContent: {
+      contents: { type: [String], default: [] },
+    },
+    key_individuals: [{
+        name: String,
+        role_in_event: String,
+        company: String,
+    }],
+  },
+  {
+    timestamps: true,
+    collection: 'articles', // Ensure this matches your collection name
+  }
+);
+
+// Use the existing model if it's already been compiled, otherwise compile it.
+// This is crucial for Next.js's hot-reloading environment.
+export default models.Article || model('Article', ArticleSchema);
+
+# File: tailwind.config.js
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  darkMode: ["class"],
+  content: [
+    './pages/**/*.{js,jsx}',
+    './components/**/*.{js,jsx}',
+    './app/**/*.{js,jsx}',
+    './src/**/*.{js,jsx}',
+  ],
+  prefix: "",
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      fontFamily: {
+        sans: ["var(--font-sans)", "sans-serif"],
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+}
