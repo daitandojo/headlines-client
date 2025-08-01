@@ -29,44 +29,41 @@ export const ArticleCard = ({ article }) => {
       value={article._id} 
       className="border-slate-700 rounded-xl bg-gradient-to-br from-slate-900 to-slate-800/60 shadow-lg shadow-black/40 transition-all duration-300 hover:shadow-xl hover:shadow-blue-900/30 hover:border-blue-500/50 hover:-translate-y-1"
     >
-      {/* Change: Use items-start to align elements to the top when text wraps */}
-      <div className="flex items-start justify-between p-4">
+      <div className="flex items-start justify-between p-3 sm:p-4">
         <AccordionTrigger className="flex-grow p-0 hover:no-underline text-left">
-          {/* Change: Use items-start to align badge with the first line of text */}
-          <div className="flex items-start gap-4 w-full">
-            {/* Change: Add a slight top margin to the badge for better visual alignment with text */}
-            <Badge className={`text-base font-bold px-3 py-1 shrink-0 mt-1 ${getRelevanceBadgeClass(article.relevance_article)}`}>
+          <div className="flex items-start gap-3 sm:gap-4 w-full">
+            <Badge className={`text-sm sm:text-base font-bold px-2.5 sm:px-3 py-1 shrink-0 mt-1 ${getRelevanceBadgeClass(article.relevance_article)}`}>
               {article.relevance_article}
             </Badge>
             <div className="flex-grow min-w-0">
-              {/* FIX: Removed 'truncate' to allow the headline to wrap */}
-              <p className="font-serif font-bold text-lg text-slate-100">
+              {/* FIX: Limits headline to 2 lines to prevent awkward wrapping */}
+              <p className="font-serif font-bold text-base sm:text-lg text-slate-100 line-clamp-2">
                 {article.headline}
               </p>
-              <p className="text-sm text-slate-400 mt-1">{article.newspaper}</p>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1">{article.newspaper}</p>
             </div>
           </div>
         </AccordionTrigger>
 
-        <div className="flex items-center gap-2 shrink-0 ml-4">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-2 sm:ml-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => window.open(article.link, '_blank')}
-            className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10"
+            className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 h-8 w-8 sm:h-9 sm:w-9"
             title="Open in new tab"
           >
-            <ExternalLink className="h-5 w-5" />
+            <ExternalLink className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={handleDelete}
             disabled={isPending}
-            className="text-slate-400 hover:text-red-400 hover:bg-red-500/10"
+            className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8 sm:h-9 sm:w-9"
             title="Delete article"
           >
-            <Trash2 className="h-5 w-5" />
+            <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
         </div>
       </div>
@@ -75,12 +72,10 @@ export const ArticleCard = ({ article }) => {
         <div className="border-t border-slate-700/50 pt-6 space-y-6">
           <div>
             <h4 className="font-semibold text-md text-slate-300 mb-2">AI Assessment</h4>
-            {/* Fix: Added break-words to prevent overflow from long unbroken strings */}
             <p className="text-slate-400 italic break-words">"{article.assessment_article}"</p>
           </div>
           <div className="max-h-60 overflow-y-auto pr-4">
             <h4 className="font-semibold text-md text-slate-300 mb-2">Article Content</h4>
-            {/* Fix: Added break-words for safety */}
             <p className="text-slate-300 leading-relaxed whitespace-pre-wrap font-serif break-words">
               {article.articleContent.contents.join('\n\n')}
             </p>

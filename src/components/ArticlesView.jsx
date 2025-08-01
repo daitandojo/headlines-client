@@ -68,9 +68,10 @@ export async function ArticlesView({ searchParams }) {
           <Filters uniqueSources={['all', ...uniqueSources]} />
         </CardHeader>
 
-        <CardContent className="pt-1 space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-medium text-slate-300">
+        <CardContent className="pt-6 space-y-6">
+          {/* This container now stacks on mobile and goes horizontal on larger screens */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+            <h2 className="text-lg sm:text-xl font-medium text-slate-300">
               Displaying {articles.length} of {totalArticles} articles
             </h2>
             {totalPages > 1 && (
