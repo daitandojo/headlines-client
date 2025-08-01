@@ -19,19 +19,16 @@ export const Filters = ({ uniqueSources }) => {
     } else {
       params.delete(key);
     }
-    // Reset to page 1 for any new filter
     params.set('page', '1'); 
     router.push(`${pathname}?${params.toString()}`);
   };
   
-  // Debounce the search input to avoid re-fetching on every keystroke
   useEffect(() => {
     const handler = setTimeout(() => {
-      // Only update the URL if the query has actually changed from what's in the URL
       if (query !== (searchParams.get('q') || '')) {
         handleFilterChange('q', query);
       }
-    }, 500); // 500ms delay
+    }, 500);
 
     return () => {
       clearTimeout(handler);
@@ -40,9 +37,10 @@ export const Filters = ({ uniqueSources }) => {
   }, [query]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+    // This now uses a 2-column grid on mobile and 4 columns on medium screens and up
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-6 items-end">
       <div className="space-y-2">
-        <Label htmlFor="search" className="text-slate-300">Search Headlines & Content</Label>
+        <Label htmlFor="search" className="text-slate-300">Search</Label>
         <Input
           id="search"
           type="text"
@@ -66,12 +64,12 @@ export const Filters = ({ uniqueSources }) => {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="source" className="text-slate-300">Filter by Source</Label>
+        <Label htmlFor="source" className="text-slate-300">Source</Label>
         <Select
           defaultValue={searchParams.get('source') || 'all'}
           onValueChange={(value) => handleFilterChange('source', value)}
         >
-          <SelectTrigger id="source" className="bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
+          <SelectTrigger id="source" className="w-full bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
             <SelectValue placeholder="Select a source" />
           </SelectTrigger>
           <SelectContent>
@@ -89,7 +87,7 @@ export const Filters = ({ uniqueSources }) => {
           defaultValue={searchParams.get('sort') || 'date_desc'}
           onValueChange={(value) => handleFilterChange('sort', value)}
         >
-          <SelectTrigger id="sort" className="bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
+          <SelectTrigger id="sort" className="w-full bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
             <SelectValue placeholder="Select sorting" />
           </SelectTrigger>
           <SelectContent>
