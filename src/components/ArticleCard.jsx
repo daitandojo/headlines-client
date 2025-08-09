@@ -1,3 +1,4 @@
+// src/components/ArticleCard.jsx (version 2.0)
 "use client";
 
 import { useTransition } from "react";
@@ -71,16 +72,15 @@ export const ArticleCard = ({ article }) => {
       
       <AccordionContent className="p-6 pt-0">
         <div className="border-t border-slate-700/50 pt-6 space-y-6">
-          <div>
-            <h4 className="font-semibold text-md text-slate-300 mb-2">AI Assessment</h4>
-            <p className="text-slate-400 italic break-words">"{article.assessment_article}"</p>
-          </div>
-          <div className="max-h-60 overflow-y-auto pr-4">
-            <h4 className="font-semibold text-md text-slate-300 mb-2">Article Content</h4>
-            <p className="text-slate-300 leading-relaxed whitespace-pre-wrap font-serif break-words">
-              {article.articleContent.contents.join('\n\n')}
-            </p>
-          </div>
+          {article.assessment_article && (
+            <div>
+              <h4 className="font-semibold text-md text-slate-300 mb-2">Intelligence Analysis</h4>
+              <p className="text-slate-400 italic break-words">"{article.assessment_article}"</p>
+            </div>
+          )}
+          
+          {/* CRITICAL FIX: The section displaying raw articleContent has been removed entirely. */}
+
           {article.key_individuals && article.key_individuals.length > 0 && (
             <div>
               <h4 className="font-semibold text-md text-slate-300 mb-2">Key Individuals & Contacts</h4>

@@ -1,3 +1,4 @@
+// src/models/Article.js (version 2.0)
 import mongoose from 'mongoose';
 
 const { Schema, models, model } = mongoose;
@@ -11,9 +12,6 @@ const ArticleSchema = new Schema(
     relevance_headline: { type: Number, required: true },
     relevance_article: { type: Number },
     assessment_article: { type: String },
-    articleContent: {
-      contents: { type: [String], default: [] },
-    },
     key_individuals: [{
         name: String,
         role_in_event: String,

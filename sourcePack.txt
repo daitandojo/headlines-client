@@ -51,7 +51,7 @@ favicon.ico
   "rsc": true,
   "tsx": false,
   "tailwind": {
-    "config": "",
+    "config": "tailwind.config.js",
     "css": "src/app/globals.css",
     "baseColor": "stone",
     "cssVariables": true,
@@ -132,6 +132,8 @@ module.exports = nextConfig;
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@tailwindcss/line-clamp": "^0.4.4",
+    "autoprefixer": "^10.4.19",
     "eslint": "^8",
     "eslint-config-next": "13.5.6",
     "postcss": "^8",
@@ -140,13 +142,13 @@ module.exports = nextConfig;
 }
 
 
-# File: postcss.config.mjs
-const config = {
-  plugins: ["@tailwindcss/postcss"],
+# File: postcss.config.js
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
 };
-
-export default config;
-
 
 # File: src/actions/articles.js
 "use server";
@@ -179,6 +181,8 @@ export async function deleteArticle(articleId) {
 }
 
 # File: src/app/globals.css
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -186,19 +190,19 @@ export async function deleteArticle(articleId) {
 @layer base {
   :root {
     --background: 224 71.4% 4.1%;
-    --foreground: 210 20% 98%;
+    --foreground: 210 40% 98%;
     --card: 224 71.4% 4.1%;
-    --card-foreground: 210 20% 98%;
+    --card-foreground: 210 40% 98%;
     --popover: 224 71.4% 4.1%;
-    --popover-foreground: 210 20% 98%;
-    --primary: 210 20% 98%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
     --primary-foreground: 220.9 39.3% 11%;
     --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 20% 98%;
+    --secondary-foreground: 210 40% 98%;
     --muted: 215 27.9% 16.9%;
     --muted-foreground: 217.9 10.6% 64.9%;
     --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 20% 98%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 85.7% 97.3%;
     --border: 215 27.9% 16.9%;
@@ -210,19 +214,19 @@ export async function deleteArticle(articleId) {
   .dark {
     /* Re-define for dark mode, though they are the same in our case */
     --background: 224 71.4% 4.1%;
-    --foreground: 210 20% 98%;
+    --foreground: 210 40% 98%;
     --card: 224 71.4% 4.1%;
-    --card-foreground: 210 20% 98%;
+    --card-foreground: 210 40% 98%;
     --popover: 224 71.4% 4.1%;
-    --popover-foreground: 210 20% 98%;
-    --primary: 210 20% 98%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
     --primary-foreground: 220.9 39.3% 11%;
     --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 20% 98%;
+    --secondary-foreground: 210 40% 98%;
     --muted: 215 27.9% 16.9%;
     --muted-foreground: 217.9 10.6% 64.9%;
     --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 20% 98%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 85.7% 97.3%;
     --border: 215 27.9% 16.9%;
@@ -332,54 +336,59 @@ export const ArticleCard = ({ article }) => {
   };
 
   return (
-    <AccordionItem value={article._id} className="border-b-0 rounded-lg bg-black/20 backdrop-blur-sm border border-white/10 transition-all hover:border-white/20">
-      <div className="flex items-center justify-between p-4">
+    <AccordionItem 
+      value={article._id} 
+      className="border-slate-700 rounded-xl bg-gradient-to-br from-slate-900 to-slate-800/60 shadow-lg shadow-black/40 transition-all duration-300 hover:shadow-xl hover:shadow-blue-900/30 hover:border-blue-500/50 hover:-translate-y-1"
+    >
+      <div className="flex items-start gap-4 p-4">
+        {/* Left Column: Contains relevance badge and action buttons */}
+        <div className="flex flex-col items-center gap-y-2 shrink-0">
+          <Badge className={`text-base font-bold px-3 py-1 ${getRelevanceBadgeClass(article.relevance_article)}`}>
+            {article.relevance_article}
+          </Badge>
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => window.open(article.link, '_blank')}
+              className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 h-8 w-8"
+              title="Open in new tab"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDelete}
+              disabled={isPending}
+              className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8"
+              title="Delete article"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Right Column: The accordion trigger containing the headline, which now has more space */}
         <AccordionTrigger className="flex-grow p-0 hover:no-underline text-left">
-          <div className="flex items-center gap-4 w-full">
-            <Badge className={`text-base font-bold px-3 py-1 shrink-0 ${getRelevanceBadgeClass(article.relevance_article)}`}>
-              {article.relevance_article}
-            </Badge>
-            <div className="flex-grow min-w-0">
-              <p className="font-semibold text-lg text-slate-100 truncate">
-                {article.headline}
-              </p>
-              <p className="text-sm text-slate-400 mt-1">{article.newspaper}</p>
-            </div>
+          <div className="flex-grow min-w-0">
+            <p className="font-serif font-bold text-lg text-slate-100 line-clamp-2">
+              {article.headline}
+            </p>
+            <p className="text-sm text-slate-400 mt-1">{article.newspaper}</p>
           </div>
         </AccordionTrigger>
-
-        <div className="flex items-center gap-2 shrink-0 ml-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => window.open(article.link, '_blank')}
-            className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10"
-            title="Open in new tab"
-          >
-            <ExternalLink className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleDelete}
-            disabled={isPending}
-            className="text-slate-400 hover:text-red-400 hover:bg-red-500/10"
-            title="Delete article"
-          >
-            <Trash2 className="h-5 w-5" />
-          </Button>
-        </div>
       </div>
       
       <AccordionContent className="p-6 pt-0">
         <div className="border-t border-slate-700/50 pt-6 space-y-6">
           <div>
             <h4 className="font-semibold text-md text-slate-300 mb-2">AI Assessment</h4>
-            <p className="text-slate-400 italic">"{article.assessment_article}"</p>
+            <p className="text-slate-400 italic break-words">"{article.assessment_article}"</p>
           </div>
           <div className="max-h-60 overflow-y-auto pr-4">
             <h4 className="font-semibold text-md text-slate-300 mb-2">Article Content</h4>
-            <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">
+            <p className="text-slate-300 leading-relaxed whitespace-pre-wrap font-serif break-words">
               {article.articleContent.contents.join('\n\n')}
             </p>
           </div>
@@ -421,6 +430,7 @@ import Article from '@/models/Article';
 import { Filters } from '@/components/Filters';
 import { ArticleList } from '@/components/ArticleList';
 import { PaginationControls } from '@/components/PaginationControls';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 const ARTICLES_PER_PAGE = 10;
 
@@ -428,11 +438,19 @@ export async function ArticlesView({ searchParams }) {
   const page = parseInt(searchParams.page) || 1;
   const searchTerm = searchParams.q || '';
   const sourceFilter = searchParams.source || 'all';
-  const sortOption = searchParams.sort || 'relevance_desc';
+  const sortOption = searchParams.sort || 'date_desc';
+  
+  const minRelevanceRaw = searchParams.min_relevance;
+  const minRelevance = (minRelevanceRaw !== undefined && minRelevanceRaw !== '' && !isNaN(parseInt(minRelevanceRaw, 10)))
+    ? parseInt(minRelevanceRaw, 10)
+    : 10;
 
   await dbConnect();
 
-  const queryFilter = {};
+  const queryFilter = {
+    relevance_article: { $gte: minRelevance }
+  };
+
   if (searchTerm) {
     const searchRegex = { $regex: searchTerm, $options: 'i' };
     queryFilter.$or = [
@@ -448,10 +466,10 @@ export async function ArticlesView({ searchParams }) {
   let sort = {};
   switch (sortOption) {
     case 'relevance_asc': sort = { relevance_article: 1 }; break;
-    case 'date_desc': sort = { createdAt: -1 }; break;
+    case 'relevance_desc': sort = { relevance_article: -1 }; break;
     case 'date_asc': sort = { createdAt: 1 }; break;
-    case 'relevance_desc':
-    default: sort = { relevance_article: -1 }; break;
+    case 'date_desc':
+    default: sort = { createdAt: -1 }; break;
   }
 
   const uniqueSourcesPromise = Article.distinct('newspaper');
@@ -471,27 +489,32 @@ export async function ArticlesView({ searchParams }) {
   const totalPages = Math.ceil(totalArticles / ARTICLES_PER_PAGE);
 
   return (
-    <div className="space-y-6">
-      <div className="p-6 rounded-lg bg-black/20 backdrop-blur-sm border border-white/10">
-        <Filters uniqueSources={['all', ...uniqueSources]} searchParams={searchParams} />
-      </div>
+    <div className="max-w-5xl mx-auto">
+      <Card className="bg-black/20 backdrop-blur-sm border border-white/10 shadow-2xl shadow-black/30">
+        <CardHeader className="border-b border-white/10">
+          <Filters uniqueSources={['all', ...uniqueSources]} />
+        </CardHeader>
 
-      <div>
-        <h2 className="text-xl font-medium text-slate-300 mb-4">
-          Displaying {articles.length} of {totalArticles} articles
-        </h2>
-        {articles.length > 0 ? (
-          <ArticleList articles={JSON.parse(JSON.stringify(articles))} />
-        ) : (
-          <div className="text-center text-gray-500 py-20 rounded-lg bg-black/20 border border-white/10">
-            <p>No articles found matching your criteria.</p>
+        <CardContent className="pt-6 space-y-6">
+          {/* This container now stacks on mobile and goes horizontal on larger screens */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+            <h2 className="text-lg sm:text-xl font-medium text-slate-300">
+              Displaying {articles.length} of {totalArticles} articles
+            </h2>
+            {totalPages > 1 && (
+              <PaginationControls totalPages={totalPages} currentPage={page} />
+            )}
           </div>
-        )}
-      </div>
-      
-      {totalPages > 1 && (
-        <PaginationControls totalPages={totalPages} currentPage={page} />
-      )}
+          
+          {articles.length > 0 ? (
+            <ArticleList articles={JSON.parse(JSON.stringify(articles))} />
+          ) : (
+            <div className="text-center text-gray-500 py-20 rounded-lg bg-black/20 border border-white/10">
+              <p>No articles found matching your criteria.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -499,14 +522,17 @@ export async function ArticlesView({ searchParams }) {
 # File: src/components/Filters.jsx
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export const Filters = ({ uniqueSources, searchParams }) => {
+export const Filters = ({ uniqueSources }) => {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get('q') || '');
 
   const handleFilterChange = (key, value) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -515,30 +541,57 @@ export const Filters = ({ uniqueSources, searchParams }) => {
     } else {
       params.delete(key);
     }
-    params.set('page', '1');
+    params.set('page', '1'); 
     router.push(`${pathname}?${params.toString()}`);
   };
+  
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (query !== (searchParams.get('q') || '')) {
+        handleFilterChange('q', query);
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+    // This now uses a 2-column grid on mobile and 4 columns on medium screens and up
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-6 items-end">
       <div className="space-y-2">
-        <Label htmlFor="search" className="text-slate-300">Search Headlines & Content</Label>
+        <Label htmlFor="search" className="text-slate-300">Search</Label>
         <Input
           id="search"
           type="text"
-          placeholder="e.g., 'acquisition' or 'Povlsen'..."
-          defaultValue={searchParams.q || ''}
-          onChange={(e) => handleFilterChange('q', e.target.value)}
+          placeholder="e.g., 'acquisition'..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           className="bg-slate-900/80 border-slate-700 ring-offset-background focus-visible:ring-ring"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="source" className="text-slate-300">Filter by Source</Label>
+        <Label htmlFor="min_relevance" className="text-slate-300">Min. Relevance</Label>
+        <Input
+          id="min_relevance"
+          type="number"
+          placeholder="e.g., 10"
+          min="0"
+          max="100"
+          defaultValue={searchParams.get('min_relevance') ?? '10'}
+          onChange={(e) => handleFilterChange('min_relevance', e.target.value)}
+          className="bg-slate-900/80 border-slate-700 ring-offset-background focus-visible:ring-ring"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="source" className="text-slate-300">Source</Label>
         <Select
-          defaultValue={searchParams.source || 'all'}
+          defaultValue={searchParams.get('source') || 'all'}
           onValueChange={(value) => handleFilterChange('source', value)}
         >
-          <SelectTrigger id="source" className="bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
+          <SelectTrigger id="source" className="w-full bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
             <SelectValue placeholder="Select a source" />
           </SelectTrigger>
           <SelectContent>
@@ -553,17 +606,17 @@ export const Filters = ({ uniqueSources, searchParams }) => {
       <div className="space-y-2">
         <Label htmlFor="sort" className="text-slate-300">Sort By</Label>
         <Select
-          defaultValue={searchParams.sort || 'relevance_desc'}
+          defaultValue={searchParams.get('sort') || 'date_desc'}
           onValueChange={(value) => handleFilterChange('sort', value)}
         >
-          <SelectTrigger id="sort" className="bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
+          <SelectTrigger id="sort" className="w-full bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
             <SelectValue placeholder="Select sorting" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="relevance_desc">Relevance (High to Low)</SelectItem>
-            <SelectItem value="relevance_asc">Relevance (Low to High)</SelectItem>
             <SelectItem value="date_desc">Date (Newest First)</SelectItem>
             <SelectItem value="date_asc">Date (Oldest First)</SelectItem>
+            <SelectItem value="relevance_desc">Relevance (High to Low)</SelectItem>
+            <SelectItem value="relevance_asc">Relevance (Low to High)</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -576,15 +629,17 @@ import { Briefcase } from 'lucide-react';
 
 export const Header = () => {
   return (
-    <header className="mb-12 text-center">
-      <div className="inline-block p-4 bg-slate-800/50 border border-slate-600 rounded-xl mb-6 shadow-2xl shadow-blue-500/20">
-        <Briefcase size={48} className="text-blue-400" />
+    <header className="mb-8">
+      <div className="flex flex-row sm:flex-row items-center justify-center gap-y-4 sm:gap-x-6 mb-3">
+        
+        <Briefcase size={32} className="text-blue-400 sm:size-12" />
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-100 text-center sm:text-left">
+          Headlines<span className="hidden sm:inline"> Intelligence</span>
+        </h1>
       </div>
-      <h1 className="text-5xl font-extrabold tracking-tight text-slate-50 sm:text-6xl">
-        Headlines Intelligence
-      </h1>
-      <p className="mt-6 text-lg text-slate-400 max-w-2xl mx-auto">
-        Search, filter, and analyze curated wealth event articles with AI-powered insights.
+      
+      <p className="text-center text-base sm:text-lg text-slate-300 max-w-2xl mx-auto">
+        Search, filter, and analyze<span className="hidden sm:inline"> curated wealth event articles.</span>
       </p>
     </header>
   );
@@ -608,19 +663,21 @@ export const PaginationControls = ({ totalPages, currentPage }) => {
   };
 
   return (
-    <div className="flex items-center justify-center mt-8 gap-4">
+    <div className="flex items-center gap-2">
       <Button
         variant="secondary"
+        size="sm"
         onClick={() => handlePageChange(currentPage - 1)}
         disabled={currentPage <= 1}
       >
         Previous
       </Button>
-      <span className="text-slate-400 font-medium">
+      <span className="text-slate-400 font-medium text-sm">
         Page {currentPage} of {totalPages}
       </span>
       <Button
         variant="secondary"
+        size="sm"
         onClick={() => handlePageChange(currentPage + 1)}
         disabled={currentPage >= totalPages}
       >
@@ -1224,10 +1281,8 @@ export default models.Article || model('Article', ArticleSchema);
 module.exports = {
   darkMode: ["class"],
   content: [
-    './pages/**/*.{js,jsx}',
-    './components/**/*.{js,jsx}',
-    './app/**/*.{js,jsx}',
-    './src/**/*.{js,jsx}',
+    './src/app/**/*.{js,jsx}',
+    './src/components/**/*.{js,jsx}',
   ],
   prefix: "",
   theme: {
@@ -1281,6 +1336,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "sans-serif"],
+        serif: ["Merriweather", "serif"],
       },
       keyframes: {
         "accordion-down": {
@@ -1298,5 +1354,8 @@ module.exports = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    require('@tailwindcss/line-clamp'), // Add the new plugin here
+  ],
 }

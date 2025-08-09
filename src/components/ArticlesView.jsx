@@ -1,3 +1,4 @@
+// src/components/ArticlesView.jsx (version 2.0)
 import dbConnect from '@/lib/mongodb';
 import Article from '@/models/Article';
 import { Filters } from '@/components/Filters';
@@ -29,7 +30,7 @@ export async function ArticlesView({ searchParams }) {
     queryFilter.$or = [
       { headline: searchRegex },
       { assessment_article: searchRegex },
-      { 'articleContent.contents': searchRegex },
+      // CRITICAL FIX: Removed the search against 'articleContent.contents' as it no longer exists.
     ];
   }
   if (sourceFilter && sourceFilter !== 'all') {
