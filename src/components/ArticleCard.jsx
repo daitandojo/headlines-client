@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Trash2, ExternalLink } from "lucide-react";
 import { deleteArticle } from "@/actions/articles";
+import { getCountryFlag } from "@/lib/countries";
 
 const getRelevanceBadgeClass = (score) => {
   if (score >= 90) return "bg-red-500/20 text-red-300 border border-red-500/30 shadow-lg shadow-red-500/10";
@@ -29,6 +30,8 @@ export const ArticleCard = ({ article }) => {
       }
     });
   };
+
+  const flag = getCountryFlag(article.country);
 
   return (
     <AccordionItem
@@ -64,7 +67,7 @@ export const ArticleCard = ({ article }) => {
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>This action cannot be undone. This will permanently delete the article from the database.</AlertDialogDescription>
+                    <AlertDialogDescription>This will permanently delete the article from the database.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -77,7 +80,10 @@ export const ArticleCard = ({ article }) => {
           <AccordionTrigger className="flex-grow p-0 hover:no-underline text-left">
             <div className="flex-grow min-w-0">
               <p className="font-serif font-bold text-lg text-slate-100 line-clamp-2">{article.headline}</p>
-              <p className="text-sm text-slate-400 mt-1">{article.newspaper}</p>
+              <p className="text-sm text-slate-400 mt-1 flex items-center">
+                <span className="text-lg mr-2">{flag}</span>
+                {article.newspaper}
+              </p>
             </div>
           </AccordionTrigger>
         </div>

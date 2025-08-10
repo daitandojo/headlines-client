@@ -4,8 +4,7 @@ import { Filters } from '@/components/Filters';
 import { ArticleList } from '@/components/ArticleList';
 import { PaginationControls } from '@/components/PaginationControls';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-
-const ARTICLES_PER_PAGE = 10;
+import { ARTICLES_PER_PAGE } from '@/config/constants';
 
 export async function ArticlesView({ searchParams }) {
   const page = parseInt(searchParams.page) || 1;
@@ -74,7 +73,6 @@ export async function ArticlesView({ searchParams }) {
         <CardHeader className="border-b border-white/10">
           <Filters uniqueSources={uniqueSources} uniqueCountries={uniqueCountries} />
         </CardHeader>
-
         <CardContent className="pt-6 space-y-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
             <h2 className="text-lg sm:text-xl font-medium text-slate-300">

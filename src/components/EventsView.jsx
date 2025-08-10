@@ -4,8 +4,7 @@ import { Filters } from '@/components/Filters';
 import { EventList } from '@/components/EventList';
 import { PaginationControls } from '@/components/PaginationControls';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-
-const EVENTS_PER_PAGE = 5;
+import { EVENTS_PER_PAGE } from '@/config/constants';
 
 export async function EventsView({ searchParams }) {
   const page = parseInt(searchParams.page) || 1;
@@ -54,7 +53,7 @@ export async function EventsView({ searchParams }) {
     eventsPromise,
   ]);
   
-  const uniqueSources = []; // No source filter for events view specifically
+  const uniqueSources = []; 
 
   const totalPages = Math.ceil(totalEvents / EVENTS_PER_PAGE);
 

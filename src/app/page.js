@@ -2,7 +2,9 @@ import { Suspense } from 'react';
 import { Header } from '@/components/Header';
 import { ArticlesView } from '@/components/ArticlesView';
 import { EventsView } from '@/components/EventsView';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabSwitcher } from '@/components/TabSwitcher';
+import { SkeletonCard } from '@/components/SkeletonCard';
+import { ARTICLES_PER_PAGE, EVENTS_PER_PAGE } from '@/config/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,26 +14,24 @@ export default function HomePage({ searchParams }) {
   return (
     <div className="container mx-auto p-4 md:p-8">
       <Header />
-      <Tabs defaultValue={currentView} className="w-full">
-        <div className="flex justify-center mb-8">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="events">Synthesized Events</TabsTrigger>
-            <TabsTrigger value="articles">Raw Intelligence</TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="events">
-          <Suspense fallback={<div className="text-center text-slate-400 p-10">Loading Events...</div>}>
-            <EventsView searchParams={searchParams} />
-          </Suspense>
-        </TabsContent>
-
-        <TabsContent value="articles">
-          <Suspense fallback={<div className="text-center text-slate-400 p-10">Loading Intelligence...</div>}>
-            <ArticlesView searchParams={searchParams} />
-          </Suspense>
-        </TabsContent>
-      </Tabs>
+      <TabSwitcher currentView={currentView}>
+        {/* The children of TabSwitcher are the TabsContent components */}
+        <Suspense fallback={<SkeletonLoader count={EVENTS_PER_PAGE} />}>
+          <EventsView searchParams={searchParams} />
+        </Suspense>
+        <Suspense fallback={<SkeletonLoader count={ARTICLES_PER_PAGE} />}>
+          <ArticlesView searchParams={searchParams} />
+        </Suspense>
+      </TabSwitcher>
     </div>
   );
 }
+
+// Helper component to render multiple skeletons
+const SkeletonLoader = ({ count }) => (
+  <div className="max-w-5xl mx-auto space-y-4">
+    {Array.from({ length: count }).map((_, i) => (
+      <SkeletonCard key={i} />
+    ))}
+  </div>
+);
