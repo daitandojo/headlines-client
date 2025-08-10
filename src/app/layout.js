@@ -1,7 +1,7 @@
 import { Inter } from "next/font/google";
-// CRITICAL FIX: Import the global CSS file that defines the entire theme.
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/sonner";
 
 const fontSans = Inter({
   subsets: ["latin"],
@@ -14,7 +14,6 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
-  // CRITICAL FIX: Apply the "dark" class to the <html> tag.
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
@@ -24,6 +23,7 @@ export default function RootLayout({ children }) {
         )}
       >
         {children}
+        <Toaster />
       </body>
     </html>
   );

@@ -2,94 +2,93 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useDebounce } from '@/hooks/use-debounce';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from './ui/button';
+import { X } from 'lucide-react';
 
-export const Filters = ({ uniqueSources }) => {
+export const Filters = ({ uniqueSources, uniqueCountries }) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [query, setQuery] = useState(searchParams.get('q') || '');
+
+  const [filters, setFilters] = useState({
+    q: searchParams.get('q') || '',
+    min_relevance: searchParams.get('min_relevance') || '10',
+    source: searchParams.get('source') || '',
+    country: searchParams.get('country') || '',
+    sort: searchParams.get('sort') || 'date_desc',
+  });
+
+  const debouncedFilters = useDebounce(filters, 500);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    
+    Object.keys(debouncedFilters).forEach(key => {
+      const value = debouncedFilters[key];
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+
+    params.set('page', '1');
+    router.push(`${pathname}?${params.toString()}`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedFilters, pathname, router]);
 
   const handleFilterChange = (key, value) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value && value !== 'all') {
-      params.set(key, value);
-    } else {
-      params.delete(key);
-    }
-    params.set('page', '1'); 
-    router.push(`${pathname}?${params.toString()}`);
+    setFilters(prev => ({ ...prev, [key]: value }));
   };
   
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      if (query !== (searchParams.get('q') || '')) {
-        handleFilterChange('q', query);
-      }
-    }, 500);
-
-    return () => {
-      clearTimeout(handler);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  const clearFilters = () => {
+    const newFilters = { q: '', min_relevance: '10', source: '', country: '', sort: 'date_desc' };
+    setFilters(newFilters);
+  };
+  
+  const hasActiveFilters = filters.q || filters.min_relevance !== '10' || filters.source || filters.country;
 
   return (
-    // This now uses a 2-column grid on mobile and 4 columns on medium screens and up
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-6 items-end">
-      <div className="space-y-2">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-4 gap-y-6 items-end">
+      {/* Search Input */}
+      <div className="space-y-2 lg:col-span-2 xl:col-span-1">
         <Label htmlFor="search" className="text-slate-300">Search</Label>
-        <Input
-          id="search"
-          type="text"
-          placeholder="e.g., 'acquisition'..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="bg-slate-900/80 border-slate-700 ring-offset-background focus-visible:ring-ring"
-        />
+        <Input id="search" placeholder="e.g., 'acquisition'..." value={filters.q} onChange={(e) => handleFilterChange('q', e.target.value)} className="bg-slate-900/80 border-slate-700"/>
       </div>
+
+      {/* Country Select */}
       <div className="space-y-2">
-        <Label htmlFor="min_relevance" className="text-slate-300">Min. Relevance</Label>
-        <Input
-          id="min_relevance"
-          type="number"
-          placeholder="e.g., 10"
-          min="0"
-          max="100"
-          defaultValue={searchParams.get('min_relevance') ?? '10'}
-          onChange={(e) => handleFilterChange('min_relevance', e.target.value)}
-          className="bg-slate-900/80 border-slate-700 ring-offset-background focus-visible:ring-ring"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="source" className="text-slate-300">Source</Label>
-        <Select
-          defaultValue={searchParams.get('source') || 'all'}
-          onValueChange={(value) => handleFilterChange('source', value)}
-        >
-          <SelectTrigger id="source" className="w-full bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
-            <SelectValue placeholder="Select a source" />
-          </SelectTrigger>
+        <Label htmlFor="country" className="text-slate-300">Country</Label>
+        <Select value={filters.country} onValueChange={(value) => handleFilterChange('country', value === 'all-countries' ? '' : value)}>
+          <SelectTrigger id="country" className="w-full bg-slate-900/80 border-slate-700"><SelectValue placeholder="All Countries" /></SelectTrigger>
           <SelectContent>
-            {uniqueSources.map(source => (
-              <SelectItem key={source} value={source}>
-                {source === 'all' ? 'All Sources' : source}
-              </SelectItem>
-            ))}
+            <SelectItem value="all-countries">All Countries</SelectItem>
+            {uniqueCountries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
+
+      {/* Source Select */}
+      <div className="space-y-2">
+        <Label htmlFor="source" className="text-slate-300">Source</Label>
+        <Select value={filters.source} onValueChange={(value) => handleFilterChange('source', value === 'all-sources' ? '' : value)}>
+          <SelectTrigger id="source" className="w-full bg-slate-900/80 border-slate-700"><SelectValue placeholder="All Sources" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all-sources">All Sources</SelectItem>
+            {uniqueSources.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      
+      {/* Sort Select */}
       <div className="space-y-2">
         <Label htmlFor="sort" className="text-slate-300">Sort By</Label>
-        <Select
-          defaultValue={searchParams.get('sort') || 'date_desc'}
-          onValueChange={(value) => handleFilterChange('sort', value)}
-        >
-          <SelectTrigger id="sort" className="w-full bg-slate-900/80 border-slate-700 ring-offset-background focus:ring-ring">
-            <SelectValue placeholder="Select sorting" />
-          </SelectTrigger>
+        <Select value={filters.sort} onValueChange={(value) => handleFilterChange('sort', value)}>
+          <SelectTrigger id="sort" className="w-full bg-slate-900/80 border-slate-700"><SelectValue placeholder="Select sorting" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="date_desc">Date (Newest First)</SelectItem>
             <SelectItem value="date_asc">Date (Oldest First)</SelectItem>
@@ -97,6 +96,15 @@ export const Filters = ({ uniqueSources }) => {
             <SelectItem value="relevance_asc">Relevance (Low to High)</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Clear Button */}
+      <div className="flex items-end">
+        {hasActiveFilters && (
+          <Button variant="ghost" onClick={clearFilters} className="w-full text-slate-400 hover:text-red-400 hover:bg-red-500/10">
+            <X className="mr-2 h-4 w-4" /> Clear
+          </Button>
+        )}
       </div>
     </div>
   );

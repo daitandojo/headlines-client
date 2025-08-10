@@ -1,41 +1,31 @@
 import dbConnect from '@/lib/mongodb';
-import Article from '@/models/Article';
+import SynthesizedEvent from '@/models/SynthesizedEvent';
 import { Filters } from '@/components/Filters';
-import { ArticleList } from '@/components/ArticleList';
+import { EventList } from '@/components/EventList';
 import { PaginationControls } from '@/components/PaginationControls';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
-const ARTICLES_PER_PAGE = 10;
+const EVENTS_PER_PAGE = 5;
 
-export async function ArticlesView({ searchParams }) {
+export async function EventsView({ searchParams }) {
   const page = parseInt(searchParams.page) || 1;
   const searchTerm = searchParams.q || '';
-  const sourceFilter = searchParams.source || '';
   const countryFilter = searchParams.country || '';
   const sortOption = searchParams.sort || 'date_desc';
-  
-  const minRelevanceRaw = searchParams.min_relevance;
-  const minRelevance = (minRelevanceRaw !== undefined && minRelevanceRaw !== '' && !isNaN(parseInt(minRelevanceRaw, 10)))
-    ? parseInt(minRelevanceRaw, 10)
-    : 10;
 
   await dbConnect();
 
-  const queryFilter = {
-    relevance_headline: { $gte: minRelevance }
-  };
+  const queryFilter = {};
 
   if (searchTerm) {
     const searchRegex = { $regex: searchTerm, $options: 'i' };
     queryFilter.$or = [
-      { headline: searchRegex },
-      { assessment_article: searchRegex },
+      { synthesized_headline: searchRegex },
+      { synthesized_summary: searchRegex },
       { 'key_individuals.name': searchRegex },
       { 'key_individuals.company': searchRegex },
+      { 'source_articles.headline': searchRegex },
     ];
-  }
-  if (sourceFilter) {
-    queryFilter.newspaper = sourceFilter;
   }
   if (countryFilter) {
     queryFilter.country = countryFilter;
@@ -43,30 +33,30 @@ export async function ArticlesView({ searchParams }) {
 
   let sort = {};
   switch (sortOption) {
-    case 'relevance_asc': sort = { relevance_headline: 1, createdAt: -1 }; break;
-    case 'relevance_desc': sort = { relevance_headline: -1, createdAt: -1 }; break;
+    case 'relevance_asc': sort = { highest_relevance_score: 1, createdAt: -1 }; break;
+    case 'relevance_desc': sort = { highest_relevance_score: -1, createdAt: -1 }; break;
     case 'date_asc': sort = { createdAt: 1 }; break;
     case 'date_desc':
     default: sort = { createdAt: -1 }; break;
   }
 
-  const uniqueSourcesPromise = Article.distinct('newspaper', { newspaper: { $ne: null }});
-  const uniqueCountriesPromise = Article.distinct('country', { country: { $ne: null }});
-  const totalArticlesPromise = Article.countDocuments(queryFilter);
-  const articlesPromise = Article.find(queryFilter)
+  const uniqueCountriesPromise = SynthesizedEvent.distinct('country', { country: { $ne: null }});
+  const totalEventsPromise = SynthesizedEvent.countDocuments(queryFilter);
+  const eventsPromise = SynthesizedEvent.find(queryFilter)
     .sort(sort)
-    .skip((page - 1) * ARTICLES_PER_PAGE)
-    .limit(ARTICLES_PER_PAGE)
+    .skip((page - 1) * EVENTS_PER_PAGE)
+    .limit(EVENTS_PER_PAGE)
     .lean();
 
-  const [uniqueSources, uniqueCountries, totalArticles, articles] = await Promise.all([
-    uniqueSourcesPromise,
+  const [uniqueCountries, totalEvents, events] = await Promise.all([
     uniqueCountriesPromise,
-    totalArticlesPromise,
-    articlesPromise,
+    totalEventsPromise,
+    eventsPromise,
   ]);
+  
+  const uniqueSources = []; // No source filter for events view specifically
 
-  const totalPages = Math.ceil(totalArticles / ARTICLES_PER_PAGE);
+  const totalPages = Math.ceil(totalEvents / EVENTS_PER_PAGE);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -74,22 +64,21 @@ export async function ArticlesView({ searchParams }) {
         <CardHeader className="border-b border-white/10">
           <Filters uniqueSources={uniqueSources} uniqueCountries={uniqueCountries} />
         </CardHeader>
-
         <CardContent className="pt-6 space-y-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
             <h2 className="text-lg sm:text-xl font-medium text-slate-300">
-              Displaying {articles.length} of {totalArticles} raw articles
+              Displaying {events.length} of {totalEvents} synthesized events
             </h2>
             {totalPages > 1 && (
               <PaginationControls totalPages={totalPages} currentPage={page} />
             )}
           </div>
           
-          {articles.length > 0 ? (
-            <ArticleList articles={JSON.parse(JSON.stringify(articles))} />
+          {events.length > 0 ? (
+            <EventList events={JSON.parse(JSON.stringify(events))} />
           ) : (
             <div className="text-center text-gray-500 py-20 rounded-lg bg-black/20 border border-white/10">
-              <p>No articles found matching your criteria.</p>
+              <p>No synthesized events found matching your criteria.</p>
             </div>
           )}
         </CardContent>

@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
+import { env } from '@/lib/env'; // Use the validated environment variables
 
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = env.MONGO_URI;
 
 if (!MONGO_URI) {
+  // This check is now redundant due to Zod, but good for clarity.
   throw new Error(
-    'Please define the MONGO_URI environment variable inside .env.local'
+    'Please define the MONGO_URI environment variable inside .env or .env.local'
   );
 }
 
