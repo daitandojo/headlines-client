@@ -2,35 +2,48 @@
 
 import OpenAI from 'openai';
 import { JSDOM } from 'jsdom';
+import { Readability } from '@mozilla/readability';
 import { COMMON_COUNTRIES } from '@/lib/countries';
+import { fetchWikipediaSummary } from '@/lib/wikipedia';
 
 // Initialize GROQ Client
 if (!process.env.GROQ_API_KEY) {
-    throw new Error('GROQ API Key is missing from environment variables');
+    throw new Error('GROQ API Key is missing');
 }
-const groq = new OpenAI({
-    apiKey: process.env.GROQ_API_KEY,
-    baseURL: 'https://api.groq.com/openai/v1',
-});
+const groq = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1' });
 
-// Use the more powerful model for this complex analytical task
-const ANALYST_MODEL = 'openai/gpt-oss-120b';
+// --- Models ---
+const QUERY_PLANNER_MODEL = 'llama3-8b-8192'; // Fast model for planning
+const ANALYST_MODEL = 'openai/gpt-oss-120b'; // Powerful model for synthesis
 
-const ANALYST_PROMPT = `You are a senior analyst at a top-tier wealth management firm. Your task is to analyze the text content of a webpage and extract only the business-critical, factual intelligence.
+// --- Agent Prompts ---
+const QUERY_PLANNER_PROMPT = `You are a research planning agent. Your task is to analyze the provided "Article Text" and determine the most critical entities to look up on Wikipedia for factual verification and enrichment.
 
-**Your Mandate:**
-1.  **Identify Core Entities:** Find the primary company, key individuals (founders, CEOs, chairmen), and any mentioned portfolio companies, investors, or partners.
-2.  **Extract Factual Statements:** Isolate concrete facts about the company's business, heritage, investments, and strategy.
-3.  **AGGRESSIVELY DISCARD FLUFF:** You MUST ignore all generic marketing language, mission statements, corporate values, and other non-factual embellishments (e.g., "we have a profound belief," "we strive to make a positive contribution," "the right mindset will always be paramount").
-4.  **Synthesize a Business Summary:** Combine the extracted facts into a concise, dense, business-savvy summary. List key portfolio companies or partners in a clear, accessible way (e.g., using a bulleted list).
-5.  **Deduce Metadata:** Based on the text and URL, determine the publication name and the primary country the news is relevant to from the provided list.
+**Instructions:**
+1.  Identify the primary subject of the article (a person or a company).
+2.  Determine the 1-2 most important, specific proper nouns for which a Wikipedia search would provide essential background context.
+3.  Formulate these as precise, high-quality search queries.
 
 Respond ONLY with a valid JSON object with the following structure:
 {
-  "headline": "A concise, factual headline describing the entity.",
+  "reasoning": "A brief, one-sentence explanation of your decision-making process.",
+  "wikipedia_queries": ["Precise Search Query 1", "Precise Search Query 2"]
+}`;
+
+const FINAL_SYNTHESIS_PROMPT = `You are a senior analyst at a top-tier wealth management firm. Your task is to synthesize a business-critical summary from the provided "Article Text", fact-checking and enriching it with the "Wikipedia Context".
+
+**Your Mandate:**
+1.  **Prioritize the Article:** The main story and facts must come from the "Article Text".
+2.  **Use Wikipedia for Verification & Enrichment:** Use the "Wikipedia Context" to verify names, roles, and foundational facts (like founding dates or parent companies). Add relevant background details from Wikipedia that add value.
+3.  **AGGRESSIVELY DISCARD FLUFF:** You MUST ignore all generic marketing language, mission statements, and other non-factual embellishments. Focus only on tangible, factual intelligence (company names, investment relationships, key individuals, strategic moves).
+4.  **Deduce Metadata:** Determine the publication name and the primary country of relevance.
+
+Respond ONLY with a valid JSON object with the following structure:
+{
+  "headline": "A concise, factual headline for the synthesized summary.",
   "publication": "The name of the newspaper or website.",
   "country": "The country this news is about. Choose one from this list: [${COMMON_COUNTRIES.join(', ')}].",
-  "business_summary": "The synthesized, business-critical summary, formatted with Markdown."
+  "business_summary": "The final, synthesized, fact-checked summary, formatted with Markdown."
 }`;
 
 /**
@@ -44,42 +57,56 @@ export async function scrapeAndExtractWithAI(url) {
     }
 
     try {
-        // 1. Fetch the raw HTML of the page
+        // Step 1: Fetch and extract base text with Readability
         const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36' } });
-        if (!response.ok) return { success: false, error: `Failed to fetch URL. Status: ${response.status}` };
+        if (!response.ok) return { success: false, error: `Fetch failed: ${response.status}` };
         
         const html = await response.text();
+        const doc = new JSDOM(html, { url });
+        const article = new Readability(doc.window.document).parse();
+        if (!article || !article.textContent) return { success: false, error: "Readability could not extract content." };
         
-        // 2. Extract all text from the body to give the AI full context
-        const dom = new JSDOM(html);
-        const bodyText = dom.window.document.body.textContent.replace(/\s\s+/g, ' ').trim();
+        const articleText = article.textContent.trim().substring(0, 12000);
 
-        // Truncate to a safe length to avoid context window errors
-        const truncatedText = bodyText.substring(0, 12000);
+        // Step 2: AI Query Planning Agent decides what to search for
+        const plannerResponse = await groq.chat.completions.create({
+            model: QUERY_PLANNER_MODEL,
+            messages: [
+                { role: 'system', content: QUERY_PLANNER_PROMPT },
+                { role: 'user', content: `Article Text:\n${articleText}` }
+            ],
+            response_format: { type: 'json_object' },
+        });
+        const plan = JSON.parse(plannerResponse.choices[0].message.content);
+        
+        // Step 3: Fetch Wikipedia context for the planned entities
+        const wikipediaPromises = (plan.wikipedia_queries || []).slice(0, 2).map(entity => fetchWikipediaSummary(entity));
+        const wikipediaResults = await Promise.all(wikipediaPromises);
+        const wikipediaContext = wikipediaResults
+            .filter(res => res.success)
+            .map(res => res.summary)
+            .join('\n\n---\n\n');
 
-        // 3. Send the full context to the AI Analyst Agent
-        const analysis = await groq.chat.completions.create({
+        // Step 4: AI Analyst Agent performs the final synthesis
+        const finalAnalysis = await groq.chat.completions.create({
             model: ANALYST_MODEL,
             messages: [
-                { role: 'system', content: ANALYST_PROMPT },
-                { role: 'user', content: `Analyze the following webpage content from URL: ${url}\n\n---WEBPAGE TEXT---\n${truncatedText}` }
+                { role: 'system', content: FINAL_SYNTHESIS_PROMPT },
+                { role: 'user', content: `URL: ${url}\n\n---ARTICLE TEXT---\n${articleText}\n\n---WIKIPEDIA CONTEXT---\n${wikipediaContext || 'None'}` }
             ],
             response_format: { type: 'json_object' },
         });
 
-        const extractedData = JSON.parse(analysis.choices[0].message.content);
+        const finalData = JSON.parse(finalAnalysis.choices[0].message.content);
 
-        if (!extractedData.headline || !extractedData.business_summary) {
-             return { success: false, error: "AI Analyst could not reliably extract a headline and summary." };
+        if (!finalData.headline || !finalData.business_summary) {
+            return { success: false, error: "AI Analyst could not reliably synthesize a summary." };
         }
 
-        return { success: true, data: extractedData };
+        return { success: true, data: finalData };
 
     } catch (error) {
         console.error("AI Extraction Error:", error);
-        if (error.code === 'context_length_exceeded') {
-             return { success: false, error: "The article is too long for the AI to process." };
-        }
         return { success: false, error: `An unexpected error occurred: ${error.message}` };
     }
 }
