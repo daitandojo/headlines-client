@@ -13,8 +13,8 @@ if (!process.env.GROQ_API_KEY) {
 const groq = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1' });
 
 // --- Models ---
-const QUERY_PLANNER_MODEL = 'llama3-8b-8192'; // Fast model for planning
-const ANALYST_MODEL = 'openai/gpt-oss-120b'; // Powerful model for synthesis
+const QUERY_PLANNER_MODEL = 'openai/gpt-oss-20b';
+const ANALYST_MODEL = 'openai/gpt-oss-120b';
 
 // --- Agent Prompts ---
 const QUERY_PLANNER_PROMPT = `You are a research planning agent. Your task is to analyze the provided "Article Text" and determine the most critical entities to look up on Wikipedia for factual verification and enrichment.

@@ -1,59 +1,62 @@
-import dbConnect from '@/lib/mongodb';
-import SynthesizedEvent from '@/models/SynthesizedEvent';
+// src/components/EventsView.jsx (version 1.3)
+"use client";
+
+import { useState, useEffect, useCallback } from 'react';
 import { EventList } from '@/components/EventList';
-import { PaginationControls } from '@/components/PaginationControls';
+import { InfiniteScrollLoader } from '@/components/InfiniteScrollLoader';
+import { getEvents } from '@/actions/events';
 import { EVENTS_PER_PAGE } from '@/config/constants';
+import { useRealtimeUpdates } from '@/hooks/use-realtime-updates'; // NEW
 
-export async function EventsView({ searchParams }) {
-  const page = parseInt(searchParams.page) || 1;
-  const searchTerm = searchParams.q || '';
-  const countryFilter = searchParams.country || '';
+export function EventsView({ initialEvents, searchParams }) {
+    const [events, setEvents] = useState(initialEvents);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(initialEvents.length === EVENTS_PER_PAGE);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    useRealtimeUpdates(); // NEW: Activate real-time listener
 
-  await dbConnect();
+    useEffect(() => {
+        setEvents(initialEvents);
+        setPage(1);
+        setHasMore(initialEvents.length === EVENTS_PER_PAGE);
+    }, [initialEvents]);
 
-  const queryFilter = {};
+    const loadMoreEvents = useCallback(async () => {
+        if (isLoading || !hasMore) return;
+        setIsLoading(true);
 
-  if (searchTerm) {
-    const searchRegex = { $regex: searchTerm, $options: 'i' };
-    queryFilter.$or = [
-      { synthesized_headline: searchRegex },
-      { synthesized_summary: searchRegex },
-      { 'key_individuals.name': searchRegex },
-    ];
-  }
-  if (countryFilter) {
-    queryFilter.country = countryFilter;
-  }
+        const nextPage = page + 1;
+        const newEvents = await getEvents({
+            page: nextPage,
+            filters: { q: searchParams.q, country: searchParams.country },
+            sort: searchParams.sort,
+        });
 
-  const totalEventsPromise = SynthesizedEvent.countDocuments(queryFilter);
-  const eventsPromise = SynthesizedEvent.find(queryFilter)
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * EVENTS_PER_PAGE)
-    .limit(EVENTS_PER_PAGE)
-    .lean();
+        if (newEvents.length > 0) {
+            setEvents(prev => [...prev, ...newEvents]);
+            setPage(nextPage);
+        }
 
-  const [totalEvents, events] = await Promise.all([totalEventsPromise, eventsPromise]);
-  
-  const totalPages = Math.ceil(totalEvents / EVENTS_PER_PAGE);
+        if (newEvents.length < EVENTS_PER_PAGE) {
+            setHasMore(false);
+        }
+        
+        setIsLoading(false);
+    }, [isLoading, hasMore, page, searchParams]);
 
-  return (
-    <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
-            <h2 className="text-lg sm:text-xl font-medium text-slate-300">
-                Displaying {events.length} of {totalEvents} synthesized events
-            </h2>
-            {totalPages > 1 && (
-                <PaginationControls totalPages={totalPages} currentPage={page} />
+    return (
+        <div className="max-w-5xl mx-auto space-y-6">
+            {events.length > 0 ? (
+                <>
+                    <EventList events={events} />
+                    <InfiniteScrollLoader onLoadMore={loadMoreEvents} hasMore={hasMore} />
+                </>
+            ) : (
+                <div className="text-center text-gray-500 py-20 rounded-lg bg-black/20 border border-white/10">
+                    <p>No synthesized events found matching your criteria.</p>
+                </div>
             )}
         </div>
-        
-        {events.length > 0 ? (
-            <EventList events={JSON.parse(JSON.stringify(events))} />
-        ) : (
-            <div className="text-center text-gray-500 py-20 rounded-lg bg-black/20 border border-white/10">
-                <p>No synthesized events found matching your criteria.</p>
-            </div>
-        )}
-    </div>
-  );
+    );
 }

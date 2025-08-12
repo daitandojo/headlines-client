@@ -1,14 +1,6 @@
-import { Header } from '@/components/Header';
-import { MainNavTabs } from '@/components/MainNavTabs';
-
+// src/app/(main)/layout.js (version 1.7)
+// This layout file is now empty and serves only to create the route group.
+// All layout components are handled by individual pages for better control.
 export default function MainLayout({ children }) {
-    return (
-        <div className="container mx-auto p-4 md:p-8">
-            <Header />
-            <MainNavTabs />
-            <main className="mt-8">
-                {children}
-            </main>
-        </div>
-    );
+    return <>{children}</>;
 }

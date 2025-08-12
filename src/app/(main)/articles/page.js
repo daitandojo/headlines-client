@@ -1,36 +1,58 @@
+// src/app/(main)/articles/page.js (version 1.5)
 import { Suspense } from 'react';
 import { ArticlesView } from '@/components/ArticlesView';
 import { GlobalFilters } from '@/components/GlobalFilters';
-import { StatsBar } from '@/components/StatsBar';
+import { Header } from '@/components/Header';
+import { MainNavTabs } from '@/components/MainNavTabs';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { ARTICLES_PER_PAGE } from '@/config/constants';
 import dbConnect from '@/lib/mongodb';
 import Article from '@/models/Article';
 import SynthesizedEvent from '@/models/SynthesizedEvent';
+import { getArticles } from '@/actions/articles';
 
-async function getData() {
+async function getData(searchParams) {
     await dbConnect();
-    const uniqueSourcesPromise = Article.distinct('newspaper', { newspaper: { $ne: null } });
-    const uniqueCountriesPromise = Article.distinct('country', { country: { $ne: null } });
-    const articleCountPromise = Article.countDocuments();
-    const eventCountPromise = SynthesizedEvent.countDocuments();
+    const query = {
+        country: { $ne: null },
+        $or: [
+            { relevance_article: { $gt: 25 } },
+            { relevance_headline: { $gt: 25 } }
+        ]
+    };
+
+    const uniqueCountriesPromise = Article.distinct('country', query);
+    const articleCountPromise = Article.countDocuments(query);
+    const eventCountPromise = SynthesizedEvent.countDocuments({ highest_relevance_score: { $gt: 25 } });
     
-    const [uniqueSources, uniqueCountries, articleCount, eventCount] = await Promise.all([
-        uniqueSourcesPromise, uniqueCountriesPromise, articleCountPromise, eventCountPromise
+    const initialArticlesPromise = getArticles({ 
+        page: 1, 
+        filters: { q: searchParams.q, country: searchParams.country },
+        sort: searchParams.sort 
+    });
+
+    const [uniqueCountries, articleCount, eventCount, initialArticles] = await Promise.all([
+        uniqueCountriesPromise, articleCountPromise, eventCountPromise, initialArticlesPromise
     ]);
-    return { uniqueSources, uniqueCountries, articleCount, eventCount };
+    return { uniqueCountries, articleCount, eventCount, initialArticles };
 }
 
 export default async function ArticlesPage({ searchParams }) {
-    const { uniqueSources, uniqueCountries, articleCount, eventCount } = await getData();
+    const { uniqueCountries, articleCount, eventCount, initialArticles } = await getData(searchParams);
     return (
-        <>
-            <StatsBar articleCount={articleCount} eventCount={eventCount} />
-            <GlobalFilters uniqueSources={uniqueSources} uniqueCountries={uniqueCountries} />
-            <Suspense fallback={<SkeletonLoader count={ARTICLES_PER_PAGE} />}>
-                <ArticlesView searchParams={searchParams} />
-            </Suspense>
-        </>
+        <div className="container mx-auto p-4 md:p-8 flex flex-col min-h-screen">
+            <Header articleCount={articleCount} eventCount={eventCount} />
+            <MainNavTabs />
+            <main className="flex-grow flex flex-col mt-8">
+                <GlobalFilters uniqueCountries={uniqueCountries} />
+                <Suspense fallback={<SkeletonLoader count={ARTICLES_PER_PAGE} />}>
+                    <ArticlesView 
+                        initialArticles={initialArticles} 
+                        searchParams={searchParams} 
+                    />
+                </Suspense>
+            </main>
+        </div>
     );
 }
 

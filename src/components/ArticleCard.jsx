@@ -1,3 +1,4 @@
+// src/components/ArticleCard.jsx (version 1.1)
 "use client";
 
 import { useTransition } from "react";
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Trash2, ExternalLink } from "lucide-react";
 import { deleteArticle } from "@/actions/articles";
-import { getCountryFlag } from "@/lib/countries"; // Correct import
+import { getCountryFlag } from "@/lib/countries";
 
 const getRelevanceBadgeClass = (score) => {
   if (score >= 90) return "bg-red-500/20 text-red-300 border border-red-500/30 shadow-lg shadow-red-500/10";
@@ -31,7 +32,9 @@ export const ArticleCard = ({ article }) => {
     });
   };
 
-  const flag = getCountryFlag(article.country); // This now works correctly
+  const flag = getCountryFlag(article.country);
+  const formattedDate = new Date(article.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const relevanceScore = article.relevance_article || article.relevance_headline;
 
   return (
     <AccordionItem
@@ -41,8 +44,8 @@ export const ArticleCard = ({ article }) => {
       <TooltipProvider delayDuration={100}>
         <div className="flex items-start gap-4 p-4">
           <div className="flex flex-col items-center gap-y-2 shrink-0">
-            <Badge className={`text-base font-bold px-3 py-1 ${getRelevanceBadgeClass(article.relevance_article || article.relevance_headline)}`}>
-              {article.relevance_article || article.relevance_headline}
+            <Badge className={`text-base font-bold px-3 py-1 ${getRelevanceBadgeClass(relevanceScore)}`}>
+              {relevanceScore}
             </Badge>
             <div className="flex gap-1">
               <Tooltip>
@@ -79,11 +82,14 @@ export const ArticleCard = ({ article }) => {
           </div>
           <AccordionTrigger className="flex-grow p-0 hover:no-underline text-left">
             <div className="flex-grow min-w-0">
-              <p className="font-serif font-bold text-lg text-slate-100 line-clamp-2">{article.headline}</p>
-              <p className="text-sm text-slate-400 mt-1 flex items-center">
-                <span className="text-lg mr-2">{flag}</span>
-                {article.newspaper}
-              </p>
+              <p className="font-serif font-bold text-lg text-slate-100 line-clamp-2">{article.headline_en || article.headline}</p>
+              <div className="flex items-center justify-between text-sm text-slate-400 mt-1">
+                <p className="flex items-center">
+                  <span className="text-lg mr-2">{flag}</span>
+                  {article.newspaper}
+                </p>
+                <p className="text-xs text-slate-500 font-mono">{formattedDate}</p>
+              </div>
             </div>
           </AccordionTrigger>
         </div>

@@ -1,22 +1,26 @@
+// next.config.js (version 1.3)
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  // The PWA plugin can be unreliable in dev mode with HMR.
+  // It's best to disable it for development and test PWA features in a production build.
+  // To test PWA: `npm run build && npm run start`
+  disable: process.env.NODE_ENV === 'development',
+});
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
     serverActions: true,
   },
   
-  // --- START: PROFESSIONAL FIX FOR NATIVE MODULES ---
-  // This configuration tells Next.js's bundler (Webpack) to treat
-  // 'onnxruntime-node' as an external module. This prevents Webpack
-  // from trying to bundle the native .node file for the client,
-  // which is the cause of the compilation error.
   webpack: (config, { isServer }) => {
-    // Only apply this rule on the server-side build
     if (isServer) {
       config.externals = [...config.externals, 'onnxruntime-node'];
     }
     return config;
   },
-  // --- END: PROFESSIONAL FIX ---
 };
 
-module.exports = nextConfig;
+module.exports = withPWA(nextConfig);

@@ -107,7 +107,6 @@
 
 /* --- Premier Scrollbar Styling --- */
 @layer utilities {
-  /* For Chrome, Safari, and other WebKit browsers */
   .custom-scrollbar::-webkit-scrollbar {
     height: 6px;
     width: 6px;
@@ -123,10 +122,16 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--accent));
   }
-
-  /* For Firefox */
   .custom-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--secondary)) hsl(var(--muted) / 0.5);
+  }
+
+  /* --- NEW: Source-Aware Coloring for Chat --- */
+  .rag-source, .wiki-source {
+    color: #a7f3d0; /* A pleasant light green for trusted sources */
+  }
+  .llm-source {
+    color: #fde68a; /* A soft orange for general knowledge */
   }
 }

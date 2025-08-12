@@ -1,3 +1,4 @@
+// src/components/GlobalFilters.jsx (version 1.2)
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -10,16 +11,15 @@ import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 
-export function GlobalFilters({ uniqueSources, uniqueCountries }) {
+export function GlobalFilters({ uniqueCountries }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // useMemo ensures that the initial state is calculated only once
   const initialState = useMemo(() => ({
     q: searchParams.get('q') || '',
-    source: searchParams.get('source') || '',
     country: searchParams.get('country') || '',
+    sort: searchParams.get('sort') || 'date_desc',
   }), [searchParams]);
 
   const [filters, setFilters] = useState(initialState);
@@ -38,7 +38,7 @@ export function GlobalFilters({ uniqueSources, uniqueCountries }) {
       }
     });
 
-    params.set('page', '1'); // Reset page on any filter change
+    params.set('page', '1');
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   }, [debouncedFilters, pathname, router, searchParams]);
 
@@ -47,16 +47,16 @@ export function GlobalFilters({ uniqueSources, uniqueCountries }) {
   };
   
   const clearFilters = () => {
-    setFilters({ q: '', source: '', country: '' });
+    setFilters({ q: '', country: '', sort: 'date_desc' });
   };
   
-  const hasActiveFilters = filters.q || filters.source || filters.country;
+  const hasActiveFilters = filters.q || filters.country || filters.sort !== 'date_desc';
 
   return (
     <Card className="mb-8 bg-black/20 backdrop-blur-sm border-white/10 shadow-lg shadow-black/30">
         <CardContent className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                <div className="space-y-1.5 lg:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="space-y-1.5 md:col-span-3 lg:col-span-1">
                     <Label htmlFor="search" className="text-slate-300">Search</Label>
                     <Input id="search" placeholder="Search by name, company, or keyword..." value={filters.q} onChange={(e) => handleFilterChange('q', e.target.value)} className="bg-slate-900/80 border-slate-700"/>
                 </div>
@@ -72,13 +72,14 @@ export function GlobalFilters({ uniqueSources, uniqueCountries }) {
                 </div>
                 <div className="flex items-end space-x-2">
                     <div className="space-y-1.5 flex-grow">
-                        <Label htmlFor="source" className="text-slate-300">Source</Label>
-                        <Select value={filters.source} onValueChange={(value) => handleFilterChange('source', value === 'all-sources' ? '' : value)}>
-                            <SelectTrigger id="source" className="w-full bg-slate-900/80 border-slate-700"><SelectValue placeholder="All Sources" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all-sources">All Sources</SelectItem>
-                                {uniqueSources.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                            </SelectContent>
+                        <Label htmlFor="sort" className="text-slate-300">Sort By</Label>
+                        <Select value={filters.sort} onValueChange={(value) => handleFilterChange('sort', value)}>
+                          <SelectTrigger id="sort" className="w-full bg-slate-900/80 border-slate-700"><SelectValue placeholder="Select sorting" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="date_desc">Date (Newest First)</SelectItem>
+                            <SelectItem value="date_asc">Date (Oldest First)</SelectItem>
+                            <SelectItem value="relevance_desc">Relevance (High to Low)</SelectItem>
+                          </SelectContent>
                         </Select>
                     </div>
                     {hasActiveFilters && (

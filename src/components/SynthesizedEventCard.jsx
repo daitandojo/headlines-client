@@ -1,3 +1,4 @@
+// src/components/SynthesizedEventCard.jsx (version 1.2)
 "use client";
 
 import { useTransition } from "react";
@@ -42,6 +43,7 @@ export const SynthesizedEventCard = ({ event }) => {
   };
   
   const flag = getCountryFlag(event.country);
+  const formattedDate = new Date(event.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
     <AccordionItem 
@@ -95,23 +97,19 @@ export const SynthesizedEventCard = ({ event }) => {
                 {event.synthesized_headline}
               </h3>
               <p className="text-slate-300 leading-relaxed mb-4">{event.synthesized_summary}</p>
-              {event.key_individuals && event.key_individuals.length > 0 && (
-                <div className="flex items-start gap-3 mb-4 text-slate-400">
-                  <Users className="h-5 w-5 mt-1 shrink-0 text-slate-500" />
-                  <div>
-                    <h4 className="font-semibold text-sm text-slate-300">Key Individuals</h4>
-                    <div className="text-sm">
-                      {event.key_individuals.map((p, index) => (
-                        <span key={p.name}>
-                            {p.name}
-                            <span className="text-slate-500"> ({p.role_in_event})</span>
-                            {index < event.key_individuals.length - 1 && <span className="mx-2 text-slate-600">•</span>}
-                        </span>
-                      ))}
+              
+               <div className="flex justify-between items-center mb-4">
+                  {event.key_individuals && event.key_individuals.length > 0 && (
+                    <div className="flex items-start gap-3 text-slate-400">
+                      <Users className="h-5 w-5 mt-0.5 shrink-0 text-slate-500" />
+                      <p className="text-sm font-medium text-slate-300">
+                        {event.key_individuals.length} Key Individual(s)
+                      </p>
                     </div>
-                  </div>
-                </div>
-              )}
+                  )}
+                  <p className="text-xs text-slate-500 font-mono">{formattedDate}</p>
+              </div>
+
               {event.ai_assessment_reason && (
                   <p className="text-xs text-slate-500 italic border-l-2 border-slate-700 pl-3">
                     {event.ai_assessment_reason}
@@ -124,7 +122,7 @@ export const SynthesizedEventCard = ({ event }) => {
       <AccordionTrigger className="px-6 py-2 text-sm text-slate-400 hover:text-slate-200 hover:no-underline rounded-b-xl bg-black/20 hover:bg-slate-800/50">
         <div className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            <span>Show {event.source_articles.length} Source Article(s)</span>
+            <span>Show {event.source_articles.length || 1} Source Article(s)</span>
         </div>
       </AccordionTrigger>
       <AccordionContent className="p-6 pt-4">

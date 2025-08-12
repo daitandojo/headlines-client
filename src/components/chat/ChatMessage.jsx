@@ -1,47 +1,27 @@
+// src/components/chat/ChatMessage.jsx (version 1.4)
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw'; // NEW: Import the rehype-raw plugin
+import rehypeRaw from 'rehype-raw'; // Re-import rehype-raw
 import { cn } from '@/lib/utils';
 import { User, Bot } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertTriangle } from 'lucide-react';
 
-export function ChatMessage({ message, verifiedContent }) {
+const processTaggedContent = (content) => {
+    // Replace custom tags with spans that have the correct class.
+    // This is done on the string itself before passing it to the Markdown renderer.
+    // The rehype-raw plugin will then correctly render these spans inline.
+    let processedContent = content.replace(/<rag>/g, '<span class="rag-source">');
+    processedContent = processedContent.replace(/<\/rag>/g, '</span>');
+    processedContent = processedContent.replace(/<wiki>/g, '<span class="wiki-source">');
+    processedContent = processedContent.replace(/<\/wiki>/g, '</span>');
+    processedContent = processedContent.replace(/<llm>/g, '<span class="llm-source">');
+    processedContent = processedContent.replace(/<\/llm>/g, '</span>');
+    return processedContent;
+};
+
+export function ChatMessage({ message }) {
   const isUser = message.role === 'user';
   
-  const renderContent = () => {
-    if (verifiedContent) {
-        return verifiedContent.map((claim, index) => {
-            if (claim.isVerified) {
-                return (
-                    <span key={index} className="text-yellow-300">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{claim.text}</ReactMarkdown>
-                    </span>
-                );
-            } else {
-                return (
-                    <TooltipProvider key={index}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span className="text-slate-400 line-through decoration-red-500/80 decoration-2">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{claim.text}</ReactMarkdown>
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent className="bg-slate-800 border-slate-700 text-slate-200">
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                                    <p>Verification failed against database.</p>
-                                </div>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                );
-            }
-        });
-    }
-    return <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{message.content}</ReactMarkdown>;
-  };
-
   return (
     <div className={cn('flex items-start gap-4', isUser && 'justify-end')}>
       {!isUser && (
@@ -50,13 +30,20 @@ export function ChatMessage({ message, verifiedContent }) {
         </div>
       )}
       <div className={cn(
-          'px-4 py-3 rounded-xl max-w-2xl',
+          'px-4 py-3 rounded-xl max-w-[85%]',
           isUser ? 'bg-slate-700' : 'bg-slate-800'
       )}>
-        {/* NEW: Wrapper div to handle table overflow */}
         <div className="overflow-x-auto custom-scrollbar">
-            <div className="prose prose-sm prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-2 prose-li:my-0 text-slate-200">
-                {renderContent()}
+            <div className="prose prose-sm prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-2 prose-li:my-0 text-slate-200">
+                {isUser ? (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                        {message.content}
+                    </ReactMarkdown>
+                ) : (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                        {processTaggedContent(message.content)}
+                    </ReactMarkdown>
+                )}
             </div>
         </div>
       </div>

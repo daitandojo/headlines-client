@@ -1,4 +1,4 @@
-// src/models/Article.js (version 2.0)
+// src/models/Article.js (version 2.1)
 import mongoose from 'mongoose';
 
 const { Schema, models, model } = mongoose;
@@ -6,9 +6,11 @@ const { Schema, models, model } = mongoose;
 const ArticleSchema = new Schema(
   {
     headline: { type: String, required: true },
+    headline_en: { type: String }, // For English translation
     link: { type: String, required: true, unique: true },
     newspaper: { type: String, required: true },
     source: { type: String, required: true },
+    country: { type: String },
     relevance_headline: { type: Number, required: true },
     relevance_article: { type: Number },
     assessment_article: { type: String },
@@ -16,14 +18,13 @@ const ArticleSchema = new Schema(
         name: String,
         role_in_event: String,
         company: String,
+        email_suggestion: { type: String },
     }],
   },
   {
-    timestamps: true,
-    collection: 'articles', // Ensure this matches your collection name
+    timestamps: true, // Enable createdAt and updatedAt fields
+    collection: 'articles',
   }
 );
 
-// Use the existing model if it's already been compiled, otherwise compile it.
-// This is crucial for Next.js's hot-reloading environment.
 export default models.Article || model('Article', ArticleSchema);

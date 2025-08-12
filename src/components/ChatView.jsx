@@ -1,72 +1,76 @@
+// src/components/ChatView.jsx (version 1.7)
 "use client";
 
 import { useChat } from 'ai/react';
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatScrollAnchor } from '@/components/chat/ChatScrollAnchor';
 import { ChatThinkingIndicator } from '@/components/chat/ChatThinkingIndicator';
-import { useLocalStorage } from '@/hooks/use-local-storage';
+import { useAppContext } from '@/context/AppContext';
+import { generateChatTitle } from '@/actions/chat';
 
-export function ChatView() {
-    const [chatId] = useLocalStorage('chatId', `chat_${Date.now()}`);
-    const [savedMessages, setSavedMessages] = useLocalStorage(`chatHistory_${chatId}`, []);
-    const [status, setStatus] = useState('Awaiting input...');
-    const [verifiedMessages, setVerifiedMessages] = useState({});
-
-    const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-        api: '/api/chat/generate',
-        initialMessages: savedMessages,
-        onResponse: () => setStatus('Synthesizing response...'),
+export function ChatView({ chatId, updateChatTitle, getMessages, setMessages }) {
+    const { chatContextPrompt, setChatContextPrompt } = useAppContext();
+    
+    const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, append } = useChat({
+        id: chatId,
+        api: '/api/chat',
+        initialMessages: getMessages(chatId),
         onFinish: async (message) => {
-            const originalQuestion = messages.find(m => m.id === message.id && m.role === 'user')?.content;
-            if (message.role === 'assistant' && originalQuestion) {
-                setStatus('Verifying facts against knowledge base...');
-                try {
-                    const response = await fetch('/api/chat/verify', {
-                        method: 'POST',
-                        body: JSON.stringify({ answer: message.content, originalQuestion }),
-                    });
-                    const { verifiedClaims } = await response.json();
-                    if (verifiedClaims) {
-                        setVerifiedMessages(prev => ({ ...prev, [message.id]: verifiedClaims }));
-                    }
-                } catch (error) {
-                    console.error("Verification failed:", error);
+            const currentMessages = [...messages, message];
+            setMessages(chatId, currentMessages);
+
+            if (currentMessages.length === 2) {
+                const result = await generateChatTitle(currentMessages);
+                if (result.success) {
+                    updateChatTitle(chatId, result.title);
                 }
             }
-            setSavedMessages(prev => [...prev, message]);
-            setStatus('Awaiting input...');
         },
-        onError: () => setStatus('Error. Please try again.'),
     });
+
+    useEffect(() => {
+        if (chatContextPrompt) {
+            const userMessage = { role: 'user', content: chatContextPrompt };
+            setMessages(chatId, [...messages, userMessage]);
+            append(userMessage);
+            setChatContextPrompt('');
+        }
+    }, [chatContextPrompt, append, setChatContextPrompt, chatId, setMessages, messages]);
     
+    // Corrected Submit Handler: No longer manually adds the user message.
+    // The `useChat` hook handles this optimistically.
     const customHandleSubmit = (e) => {
-        setStatus('Querying knowledge base...');
+        e.preventDefault();
         handleSubmit(e);
     };
 
     return (
-        <div className="max-w-5xl mx-auto">
-            <Card className="bg-black/20 backdrop-blur-sm border border-white/10 shadow-2xl shadow-black/30 h-[80vh] flex flex-col">
-                <div className="flex-grow overflow-y-auto p-4 space-y-6">
+        <div className="flex-grow flex flex-col justify-between h-full min-h-0">
+            <Card className="bg-black/20 backdrop-blur-sm border border-white/10 shadow-2xl shadow-black/30 h-full flex flex-col">
+                <div className="flex-grow overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                    {messages.length === 0 && !isLoading && (
+                        <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                            <p className="text-lg">Ask anything about the knowledge base.</p>
+                        </div>
+                    )}
                     {messages.map(m => (
-                        <ChatMessage 
-                            key={m.id} 
-                            message={m} 
-                            verifiedContent={verifiedMessages[m.id]} 
-                        />
+                        <ChatMessage key={m.id} message={m} />
                     ))}
-                    {isLoading && <ChatThinkingIndicator status={status} />}
+                    {isLoading && <ChatThinkingIndicator status="Thinking..." />}
                     <ChatScrollAnchor messages={messages} />
                 </div>
-                <ChatInput 
-                    input={input}
-                    handleInputChange={handleInputChange}
-                    handleSubmit={customHandleSubmit}
-                    isLoading={isLoading}
-                />
+                <div className="px-4 pb-4">
+                    <ChatInput 
+                        input={input}
+                        setInput={setInput}
+                        handleInputChange={handleInputChange}
+                        handleSubmit={customHandleSubmit}
+                        isLoading={isLoading}
+                    />
+                </div>
             </Card>
         </div>
     );

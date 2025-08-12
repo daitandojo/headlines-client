@@ -1,3 +1,4 @@
+// src/models/SynthesizedEvent.js (version 1.1)
 import mongoose from 'mongoose';
 
 const { Schema, models, model } = mongoose;
@@ -33,7 +34,7 @@ const SynthesizedEventSchema = new Schema(
     event_date: { type: Date, default: Date.now },
   },
   {
-    timestamps: true,
+    timestamps: true, // Enable createdAt and updatedAt fields
     collection: 'synthesized_events',
   }
 );

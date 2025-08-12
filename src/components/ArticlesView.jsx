@@ -1,63 +1,62 @@
-import dbConnect from '@/lib/mongodb';
-import Article from '@/models/Article';
+// src/components/ArticlesView.jsx (version 1.3)
+"use client";
+
+import { useState, useEffect, useCallback } from 'react';
 import { ArticleList } from '@/components/ArticleList';
-import { PaginationControls } from '@/components/PaginationControls';
+import { InfiniteScrollLoader } from '@/components/InfiniteScrollLoader';
+import { getArticles } from '@/actions/articles';
 import { ARTICLES_PER_PAGE } from '@/config/constants';
+import { useRealtimeUpdates } from '@/hooks/use-realtime-updates'; // NEW
 
-export async function ArticlesView({ searchParams }) {
-  const page = parseInt(searchParams.page) || 1;
-  const searchTerm = searchParams.q || '';
-  const sourceFilter = searchParams.source || '';
-  const countryFilter = searchParams.country || '';
-  
-  await dbConnect();
+export function ArticlesView({ initialArticles, searchParams }) {
+    const [articles, setArticles] = useState(initialArticles);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(initialArticles.length === ARTICLES_PER_PAGE);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    useRealtimeUpdates(); // NEW: Activate real-time listener
 
-  const queryFilter = {};
+    useEffect(() => {
+        setArticles(initialArticles);
+        setPage(1);
+        setHasMore(initialArticles.length === ARTICLES_PER_PAGE);
+    }, [initialArticles]);
 
-  if (searchTerm) {
-    const searchRegex = { $regex: searchTerm, $options: 'i' };
-    queryFilter.$or = [
-      { headline: searchRegex },
-      { assessment_article: searchRegex },
-      { 'key_individuals.name': searchRegex },
-    ];
-  }
-  if (sourceFilter) {
-    queryFilter.newspaper = sourceFilter;
-  }
-  if (countryFilter) {
-    queryFilter.country = countryFilter;
-  }
+    const loadMoreArticles = useCallback(async () => {
+        if (isLoading || !hasMore) return;
+        setIsLoading(true);
 
-  const totalArticlesPromise = Article.countDocuments(queryFilter);
-  const articlesPromise = Article.find(queryFilter)
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * ARTICLES_PER_PAGE)
-    .limit(ARTICLES_PER_PAGE)
-    .lean();
+        const nextPage = page + 1;
+        const newArticles = await getArticles({
+            page: nextPage,
+            filters: { q: searchParams.q, country: searchParams.country },
+            sort: searchParams.sort,
+        });
 
-  const [totalArticles, articles] = await Promise.all([totalArticlesPromise, articlesPromise]);
+        if (newArticles.length > 0) {
+            setArticles(prev => [...prev, ...newArticles]);
+            setPage(nextPage);
+        }
+        
+        if (newArticles.length < ARTICLES_PER_PAGE) {
+            setHasMore(false);
+        }
+        
+        setIsLoading(false);
+    }, [isLoading, hasMore, page, searchParams]);
 
-  const totalPages = Math.ceil(totalArticles / ARTICLES_PER_PAGE);
-
-  return (
-    <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
-            <h2 className="text-lg sm:text-xl font-medium text-slate-300">
-                Displaying {articles.length} of {totalArticles} raw articles
-            </h2>
-            {totalPages > 1 && (
-                <PaginationControls totalPages={totalPages} currentPage={page} />
+    return (
+        <div className="max-w-5xl mx-auto space-y-6">
+            {articles.length > 0 ? (
+                <>
+                    <ArticleList articles={articles} />
+                    <InfiniteScrollLoader onLoadMore={loadMoreArticles} hasMore={hasMore} />
+                </>
+            ) : (
+                <div className="text-center text-gray-500 py-20 rounded-lg bg-black/20 border border-white/10">
+                    <p>No articles found matching your criteria.</p>
+                </div>
             )}
         </div>
-        
-        {articles.length > 0 ? (
-            <ArticleList articles={JSON.parse(JSON.stringify(articles))} />
-        ) : (
-            <div className="text-center text-gray-500 py-20 rounded-lg bg-black/20 border border-white/10">
-                <p>No articles found matching your criteria.</p>
-            </div>
-        )}
-    </div>
-  );
+    );
 }
