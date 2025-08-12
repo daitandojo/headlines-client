@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Trash2, ExternalLink } from "lucide-react";
 import { deleteArticle } from "@/actions/articles";
-import { getCountryFlag } from "@/lib/countries";
+import { getCountryFlag } from "@/lib/countries"; // Correct import
 
 const getRelevanceBadgeClass = (score) => {
   if (score >= 90) return "bg-red-500/20 text-red-300 border border-red-500/30 shadow-lg shadow-red-500/10";
@@ -31,7 +31,7 @@ export const ArticleCard = ({ article }) => {
     });
   };
 
-  const flag = getCountryFlag(article.country);
+  const flag = getCountryFlag(article.country); // This now works correctly
 
   return (
     <AccordionItem

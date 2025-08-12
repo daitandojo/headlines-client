@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 @layer base {
+  /* Step 1: Define all CSS custom properties (variables) first. */
   :root {
     --background: 224 71.4% 4.1%;
     --foreground: 210 40% 98%;
@@ -29,7 +30,7 @@
   }
 
   .dark {
-    /* Re-define for dark mode, though they are the same in our case */
+    /* Re-definitions for dark mode, even if they are the same */
     --background: 224 71.4% 4.1%;
     --foreground: 210 40% 98%;
     --card: 224 71.4% 4.1%;
@@ -50,15 +51,16 @@
     --input: 215 27.9% 16.9%;
     --ring: 217 91% 60%;
   }
-}
 
-@layer base {
+  /* Step 2: Apply base styles using the variables directly, NOT @apply. */
+  /* This breaks the circular dependency that was causing the build to fail. */
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
+
   body {
-    @apply bg-background text-foreground;
     background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     background-image: radial-gradient(
         at 27% 37%,
         hsla(215, 98%, 43%, 0.15) 0px,
@@ -74,5 +76,35 @@
         hsla(355, 98%, 51%, 0.1) 0px,
         transparent 50%
       );
+  }
+
+  /* Professional Table Styling for Chat */
+  .prose {
+    --tw-prose-body: theme(colors.slate[300]);
+    --tw-prose-headings: theme(colors.slate[100]);
+    --tw-prose-lead: theme(colors.slate[400]);
+    --tw-prose-links: theme(colors.blue[400]);
+    --tw-prose-bold: theme(colors.slate[100]);
+    --tw-prose-counters: theme(colors.slate[400]);
+    --tw-prose-bullets: theme(colors.slate[600]);
+    --tw-prose-hr: theme(colors.slate[700]);
+    --tw-prose-quotes: theme(colors.slate[200]);
+    --tw-prose-quote-borders: theme(colors.slate[700]);
+    --tw-prose-captions: theme(colors.slate[400]);
+    --tw-prose-code: theme(colors.slate[100]);
+    --tw-prose-pre-code: theme(colors.slate[300]);
+    --tw-prose-pre-bg: theme(colors.slate[900]);
+    --tw-prose-th-borders: theme(colors.slate[600]);
+    --tw-prose-td-borders: theme(colors.slate[700]);
+  }
+
+  .prose table {
+    @apply text-sm;
+  }
+  .prose th {
+    @apply text-slate-200 text-left px-3 py-2;
+  }
+  .prose td {
+    @apply px-3 py-2 align-top;
   }
 }
