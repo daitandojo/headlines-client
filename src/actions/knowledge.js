@@ -5,7 +5,7 @@ import { Pinecone } from '@pinecone-database/pinecone';
 import mongoose from "mongoose";
 import dbConnect from "@/lib/mongodb";
 import Article from "@/models/Article";
-import { generateEmbedding } from "@/lib/embeddings"; // We'll create this next
+import { generateEmbedding } from "@/lib/embeddings";
 
 // Initialize Pinecone Client
 if (!process.env.PINECONE_API_KEY) {
@@ -17,21 +17,21 @@ const pineconeIndex = pc.index(process.env.PINECONE_INDEX_NAME || 'headlines');
 
 /**
  * Saves a new piece of knowledge (article) to MongoDB and Pinecone.
- * @param {{headline: string, content: string, source: string, country: string, link: string}} data
+ * @param {{headline: string, business_summary: string, source: string, country: string, link: string}} data
  * @returns {Promise<{success: boolean, message: string}>}
  */
 export async function addKnowledge(data) {
-    const { headline, content, source, country, link } = data;
+    const { headline, business_summary, source, country, link } = data;
 
-    if (!headline || !content || !source || !country || !link) {
+    if (!headline || !business_summary || !source || !country || !link) {
         return { success: false, message: "All fields are required." };
     }
 
     try {
         await dbConnect();
 
-        // 1. Generate the embedding for the new knowledge
-        const textToEmbed = `${headline}\n${content}`;
+        // 1. Generate the embedding from the business-savvy summary
+        const textToEmbed = `${headline}\n${business_summary}`;
         const embedding = await generateEmbedding(textToEmbed);
 
         // 2. Create the new Article document for MongoDB
@@ -42,12 +42,11 @@ export async function addKnowledge(data) {
             newspaper: source,
             source: "Manual Upload",
             country,
-            relevance_headline: 100, // Manually added facts are always highly relevant
+            relevance_headline: 100,
             assessment_headline: "Manually uploaded by user.",
             relevance_article: 100,
-            assessment_article: content.substring(0, 1000), // Use content as summary
-            // We keep the main embedding field in Mongo for re-indexing potential
-            embedding: embedding, 
+            assessment_article: business_summary, // Save the summary to the correct field
+            embedding: embedding,
         });
 
         // 3. Save the structured data to MongoDB
@@ -65,8 +64,9 @@ export async function addKnowledge(data) {
             }
         }]);
 
-        // 5. Revalidate the cache to show the new article in the lists
-        revalidatePath("/");
+        // 5. Revalidate paths to update the UI
+        revalidatePath("/articles");
+        revalidatePath("/events");
 
         return { success: true, message: "Knowledge successfully added and embedded." };
 

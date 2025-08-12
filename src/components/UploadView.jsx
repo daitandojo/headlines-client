@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Wand2, UploadCloud } from 'lucide-react';
 import { scrapeAndExtractWithAI } from '@/actions/extract';
 import { addKnowledge } from '@/actions/knowledge';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export function UploadView() {
     const [url, setUrl] = useState('');
@@ -30,10 +32,10 @@ export function UploadView() {
         if (result.success) {
             setExtractedData({
                 ...result.data,
-                link: url, // Add the original link to the data object
+                link: url,
             });
             setIsModalOpen(true);
-            toast.success("Content extracted successfully!");
+            toast.success("AI Analyst finished extraction!");
         } else {
             toast.error(`Extraction failed: ${result.error}`);
         }
@@ -48,7 +50,7 @@ export function UploadView() {
         setIsLoading(true);
         const result = await addKnowledge({
             headline: extractedData.headline,
-            content: extractedData.content,
+            business_summary: extractedData.business_summary, // Use the new field
             source: extractedData.publication,
             country: extractedData.country,
             link: extractedData.link,
@@ -72,7 +74,7 @@ export function UploadView() {
                     <CardHeader>
                         <CardTitle>Upload New Knowledge</CardTitle>
                         <CardDescription>
-                            Provide an article URL. The system will use an AI to extract the relevant content, which you can then add to the knowledge base.
+                            Provide an article URL. A specialized AI Analyst will extract the business-critical intelligence for you to review and add to the knowledge base.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -89,7 +91,7 @@ export function UploadView() {
                                 />
                                 <Button onClick={handleScrape} disabled={isLoading}>
                                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                                    Extract Content
+                                    Analyze & Extract
                                 </Button>
                             </div>
                         </div>
@@ -100,12 +102,12 @@ export function UploadView() {
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogContent className="sm:max-w-3xl bg-slate-900 border-slate-700">
                     <DialogHeader>
-                        <DialogTitle>Review Extracted Knowledge</DialogTitle>
+                        <DialogTitle>Review AI Analyst's Extraction</DialogTitle>
                         <DialogDescription>
-                            The AI has extracted and analyzed the content. Please verify the details before adding it to the knowledge base.
+                            The AI has extracted the following intelligence. Please verify the details before adding it to the knowledge base.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-6">
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-6 custom-scrollbar">
                         <div>
                             <Label>Headline</Label>
                             <p className="font-semibold text-slate-200">{extractedData?.headline}</p>
@@ -133,9 +135,13 @@ export function UploadView() {
                             </div>
                         </div>
                         <div>
-                            <Label>Extracted Content</Label>
-                            <div className="p-4 rounded-md bg-slate-800/50 border border-slate-700 text-sm text-slate-300 whitespace-pre-wrap max-h-64 overflow-y-auto">
-                                {extractedData?.content}
+                            <Label>Business Summary</Label>
+                            <div className="p-4 rounded-md bg-slate-800/50 border border-slate-700 text-sm text-slate-300 max-h-64 overflow-y-auto custom-scrollbar">
+                                <div className="prose prose-sm prose-invert prose-p:my-2">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {extractedData?.business_summary}
+                                    </ReactMarkdown>
+                                </div>
                             </div>
                         </div>
                     </div>

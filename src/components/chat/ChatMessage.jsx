@@ -1,20 +1,21 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw'; // NEW: Import the rehype-raw plugin
 import { cn } from '@/lib/utils';
-import { User, Bot, AlertTriangle } from 'lucide-react';
+import { User, Bot } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertTriangle } from 'lucide-react';
 
 export function ChatMessage({ message, verifiedContent }) {
   const isUser = message.role === 'user';
   
   const renderContent = () => {
     if (verifiedContent) {
-        // If we have verified content, render it with verification styles
         return verifiedContent.map((claim, index) => {
             if (claim.isVerified) {
                 return (
                     <span key={index} className="text-yellow-300">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{claim.text}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{claim.text}</ReactMarkdown>
                     </span>
                 );
             } else {
@@ -23,7 +24,7 @@ export function ChatMessage({ message, verifiedContent }) {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <span className="text-slate-400 line-through decoration-red-500/80 decoration-2">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{claim.text}</ReactMarkdown>
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{claim.text}</ReactMarkdown>
                                 </span>
                             </TooltipTrigger>
                             <TooltipContent className="bg-slate-800 border-slate-700 text-slate-200">
@@ -38,8 +39,7 @@ export function ChatMessage({ message, verifiedContent }) {
             }
         });
     }
-    // Otherwise, render the raw message content as it streams in
-    return <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>;
+    return <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{message.content}</ReactMarkdown>;
   };
 
   return (
@@ -53,8 +53,11 @@ export function ChatMessage({ message, verifiedContent }) {
           'px-4 py-3 rounded-xl max-w-2xl',
           isUser ? 'bg-slate-700' : 'bg-slate-800'
       )}>
-        <div className="prose prose-sm prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-2 prose-li:my-0 text-slate-200">
-            {renderContent()}
+        {/* NEW: Wrapper div to handle table overflow */}
+        <div className="overflow-x-auto custom-scrollbar">
+            <div className="prose prose-sm prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-2 prose-li:my-0 text-slate-200">
+                {renderContent()}
+            </div>
         </div>
       </div>
       {isUser && (
