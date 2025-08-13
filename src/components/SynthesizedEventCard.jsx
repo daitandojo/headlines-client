@@ -1,4 +1,4 @@
-// src/components/SynthesizedEventCard.jsx (version 1.4)
+// src/components/SynthesizedEventCard.jsx (version 2.0)
 "use client";
 
 import { useTransition } from "react";
@@ -9,7 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, FileText, Trash2, MessageSquarePlus } from "lucide-react";
+import { Users, FileText, Trash2, MessageSquarePlus, Mail, Building, Briefcase } from "lucide-react";
 import { deleteEvent } from "@/actions/events";
 import { getCountryFlag } from "@/lib/countries";
 import { useAppStore } from "@/store/use-app-store";
@@ -133,7 +133,7 @@ export const SynthesizedEventCard = ({ event }) => {
                 <div className="flex items-start gap-3 text-slate-400">
                   <Users className="h-5 w-5 mt-0.5 shrink-0 text-slate-500" />
                   <p className="text-sm font-medium text-slate-300">
-                    {event.key_individuals.length} Key Individual(s)
+                    {event.key_individuals.length} Key Individual(s) Identified
                   </p>
                 </div>
               )}
@@ -149,17 +149,52 @@ export const SynthesizedEventCard = ({ event }) => {
       <AccordionTrigger className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 hover:no-underline rounded-b-xl bg-black/20 hover:bg-slate-800/50">
         <div className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            <span>Show {event.source_articles.length || 1} Source Article(s)</span>
+            <span>Show Intelligence Details & Sources</span>
         </div>
       </AccordionTrigger>
       <AccordionContent className="p-4 pt-4">
-        <div className="space-y-2">
-          {event.source_articles.map(article => (
-            <a key={article.link} href={article.link} target="_blank" rel="noopener noreferrer" className="block p-3 rounded-md bg-slate-800/50 hover:bg-slate-800/80 transition-colors">
-                <p className="font-medium text-slate-200 line-clamp-1 text-sm">{article.headline}</p>
-                <p className="text-xs text-slate-400">{article.newspaper}</p>
-            </a>
-          ))}
+        {/* --- OVERHAULED DETAILS SECTION --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Key Individuals Column */}
+          {event.key_individuals && event.key_individuals.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="font-semibold text-sm text-slate-300 mb-2 border-b border-slate-700 pb-1">Key Individuals</h4>
+              {event.key_individuals.map((person, index) => (
+                <div key={index} className="p-3 rounded-md bg-slate-800/50">
+                  <p className="font-bold text-slate-100 flex items-center gap-2">
+                    <Users className="h-4 w-4 text-slate-400" /> {person.name}
+                  </p>
+                  <div className="pl-6 space-y-1 mt-1 text-sm text-slate-400">
+                    {person.role_in_event && (
+                      <p className="flex items-center gap-2">
+                        <Briefcase className="h-3 w-3" /> {person.role_in_event}
+                      </p>
+                    )}
+                    {person.company && (
+                       <p className="flex items-center gap-2">
+                        <Building className="h-3 w-3" /> {person.company}
+                      </p>
+                    )}
+                    {person.email_suggestion && (
+                      <a href={`mailto:${person.email_suggestion}`} className="flex items-center gap-2 text-blue-400 hover:underline">
+                        <Mail className="h-3 w-3" /> {person.email_suggestion}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Source Articles Column */}
+          <div className="space-y-2">
+            <h4 className="font-semibold text-sm text-slate-300 mb-2 border-b border-slate-700 pb-1">Source Articles ({event.source_articles.length})</h4>
+            {event.source_articles.map(article => (
+              <a key={article.link} href={article.link} target="_blank" rel="noopener noreferrer" className="block p-3 rounded-md bg-slate-800/50 hover:bg-slate-800/80 transition-colors">
+                  <p className="font-medium text-slate-200 line-clamp-1 text-sm">{article.headline}</p>
+                  <p className="text-xs text-slate-400">{article.newspaper}</p>
+              </a>
+            ))}
+          </div>
         </div>
       </AccordionContent>
     </AccordionItem>

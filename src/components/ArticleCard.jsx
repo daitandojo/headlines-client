@@ -1,4 +1,4 @@
-// src/components/ArticleCard.jsx (version 2.0)
+// src/components/ArticleCard.jsx (version 3.0)
 "use client";
 
 import { useTransition } from "react";
@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trash2, ExternalLink } from "lucide-react";
+import { Trash2, ExternalLink, Users, Mail, Building, Briefcase } from "lucide-react";
 import { deleteArticle } from "@/actions/articles";
 import { getCountryFlag } from "@/lib/countries";
 
@@ -43,7 +43,6 @@ export const ArticleCard = ({ article }) => {
     >
       <TooltipProvider delayDuration={100}>
         <div className="p-4">
-            {/* --- RESPONSIVE HEADER --- */}
             <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                     <Badge className={`text-sm font-bold px-2.5 py-1 ${getRelevanceBadgeClass(relevanceScore)}`}>
@@ -107,15 +106,33 @@ export const ArticleCard = ({ article }) => {
           )}
           {article.key_individuals && article.key_individuals.length > 0 && (
             <div>
-              <h4 className="font-semibold text-sm text-slate-300 mb-1">Key Individuals & Contacts</h4>
-              <ul className="list-disc list-inside text-sm text-slate-400">
-                {article.key_individuals.map(person => (
-                  <li key={person.name}>
-                    <strong>{person.name}</strong> ({person.role_in_event} at {person.company})
-                    {person.email_suggestion && <span className="text-xs text-slate-500 ml-2">{person.email_suggestion}</span>}
-                  </li>
+              <h4 className="font-semibold text-sm text-slate-300 mb-2 border-b border-slate-700 pb-1">Key Individuals</h4>
+              <div className="space-y-3 mt-2">
+                {article.key_individuals.map((person, index) => (
+                  <div key={index} className="p-3 rounded-md bg-slate-800/50">
+                    <p className="font-bold text-slate-100 flex items-center gap-2">
+                      <Users className="h-4 w-4 text-slate-400" /> {person.name}
+                    </p>
+                    <div className="pl-6 space-y-1 mt-1 text-sm text-slate-400">
+                      {person.role_in_event && (
+                        <p className="flex items-center gap-2">
+                          <Briefcase className="h-3 w-3" /> {person.role_in_event}
+                        </p>
+                      )}
+                      {person.company && (
+                         <p className="flex items-center gap-2">
+                          <Building className="h-3 w-3" /> {person.company}
+                        </p>
+                      )}
+                      {person.email_suggestion && (
+                        <a href={`mailto:${person.email_suggestion}`} className="flex items-center gap-2 text-blue-400 hover:underline">
+                          <Mail className="h-3 w-3" /> {person.email_suggestion}
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
         </div>
