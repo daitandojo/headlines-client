@@ -1,4 +1,4 @@
-// src/hooks/use-push-manager.js (version 3.0)
+// src/hooks/use-push-manager.js (version 5.0)
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -26,38 +26,50 @@ export function usePushManager() {
             console.log("[PushManager] Browser supports Service Workers and Push.");
             setIsSupported(true);
 
-            // --- DEFINITIVE PATTERN: Wait for the Service Worker to be ready, with a timeout ---
             const initializePushManager = async () => {
+                setIsLoading(true);
+                console.log("[PushManager] Initializing... Waiting for service worker to be ready.");
+
                 try {
-                    // The `navigator.serviceWorker.ready` promise resolves when the service worker
-                    // is active and controlling the page. This is the most reliable signal.
+                    // The `navigator.serviceWorker.ready` promise is the most reliable signal.
+                    // It resolves with the registration when the service worker is active.
                     const readyPromise = navigator.serviceWorker.ready;
                     
-                    // Create a timeout promise to prevent getting stuck indefinitely.
+                    // Use an extended timeout to accommodate slower mobile devices (like iOS).
                     const timeoutPromise = new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error("Service Worker readiness check timed out after 5 seconds.")), 5000)
+                        setTimeout(() => reject(new Error("Service Worker readiness check timed out after 15 seconds.")), 15000)
                     );
 
-                    // Race the two promises. Whichever finishes first wins.
+                    // Race the two promises. This prevents the app from waiting indefinitely.
                     const registration = await Promise.race([readyPromise, timeoutPromise]);
                     
-                    console.log("[PushManager] Service Worker is active and ready:", registration);
+                    console.log("[PushManager] Service Worker is now active and ready:", registration);
                     setSwRegistration(registration);
                     
+                    // Once we have a ready registration, check for an existing subscription.
                     const subscription = await registration.pushManager.getSubscription();
                     console.log("[PushManager] Initial subscription state:", subscription);
                     setIsSubscribed(!!subscription);
 
                 } catch (error) {
                     console.error("[PushManager] Initialization failed:", error);
-                    toast.error("Notification service failed.", { description: error.message });
-                    setIsSupported(false); // Gracefully disable the feature
+                    toast.error("Could not connect to the background notification service.", { 
+                        description: "This can happen during initial setup. Please try again in a moment."
+                    });
+                    setIsSupported(false); // Gracefully disable the feature if initialization fails.
                 } finally {
                     setIsLoading(false);
+                    console.log("[PushManager] Initialization finished.");
                 }
             };
 
-            initializePushManager();
+            // Delay initialization slightly to allow the service worker registration process to start.
+            const timer = setTimeout(() => {
+                initializePushManager();
+            }, 100);
+            
+            return () => clearTimeout(timer);
+
         } else {
             console.log("[PushManager] Browser does not support Service Workers or Push.");
             setIsSupported(false);
@@ -67,7 +79,7 @@ export function usePushManager() {
 
     const subscribe = useCallback(async () => {
         if (!swRegistration) {
-            toast.error("Service Worker not ready *).", { description: "The background service for notifications is still starting. Please try again in a moment." });
+            toast.error("Notification service not ready.", { description: "The background service is still starting. Please try again in a moment." });
             return false;
         }
 

@@ -1,4 +1,4 @@
-// src/app/layout.js (version 1.5)
+// src/app/layout.js (version 1.6)
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -31,11 +31,19 @@ export const metadata = {
     statusBarStyle: "black-translucent",
     title: "Headlines",
   },
+  
+  // Add the mobile-web-app-capable meta tag for broader compatibility
+  other: {
+    "mobile-web-app-capable": "yes",
+  }
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        {/* The 'mobile-web-app-capable' meta tag for Android Chrome is added via metadata object */}
+      </head>
       <body
         className={cn(
           "min-h-screen font-sans antialiased",
