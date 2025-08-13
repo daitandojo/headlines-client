@@ -1,4 +1,4 @@
-// src/hooks/use-push-manager.js (version 2.2)
+// src/hooks/use-push-manager.js (version 2.3)
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -19,7 +19,6 @@ export function usePushManager() {
     const [isSupported, setIsSupported] = useState(false);
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    // State to hold the active service worker registration
     const [swRegistration, setSwRegistration] = useState(null);
 
     useEffect(() => {
@@ -27,44 +26,48 @@ export function usePushManager() {
             console.log("[PushManager] Browser supports Service Workers and Push.");
             setIsSupported(true);
 
-            // --- ROBUST SERVICE WORKER INITIALIZATION ---
-            const initializeServiceWorker = async () => {
-                try {
-                    // 1. Register the service worker.
-                    const registration = await navigator.serviceWorker.register('/sw.js');
-                    console.log("[PushManager] Service Worker registration successful:", registration);
-                    
-                    // 2. Wait for the service worker to become active. This is the crucial step.
-                    // If there's an active worker, use it. Otherwise, wait for the new one to activate.
-                    if (registration.active) {
-                        console.log("[PushManager] Service worker is already active.");
+            // --- DEFINITIVE SERVICE WORKER INITIALIZATION ---
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                console.log("[PushManager] Service Worker registration successful:", registration);
+
+                const checkWorkerState = (worker) => {
+                    if (worker.state === 'activated') {
+                        console.log('[PushManager] Service worker is active.');
                         setSwRegistration(registration);
                     } else {
-                        console.log("[PushManager] Waiting for new service worker to activate...");
-                        // Listen for the 'controllerchange' event which signals a new worker has taken control.
-                        navigator.serviceWorker.addEventListener('controllerchange', () => {
-                            if (navigator.serviceWorker.controller) {
-                                console.log("[PushManager] New service worker has activated.");
-                                setSwRegistration(navigator.serviceWorker.controller.registration);
+                        // If the worker is installed but not active, listen for its state change.
+                        worker.addEventListener('statechange', (e) => {
+                            if (e.target.state === 'activated') {
+                                console.log('[PushManager] Service worker has become active.');
+                                setSwRegistration(registration);
                             }
                         });
                     }
-                    
-                    // 3. Check for an existing subscription.
-                    const subscription = await registration.pushManager.getSubscription();
-                    console.log("[PushManager] Initial subscription state:", subscription);
-                    setIsSubscribed(!!subscription);
+                };
 
-                } catch (error) {
-                    console.error("[PushManager] Service Worker initialization failed:", error);
-                    toast.error("PWA features disabled.", { description: "Could not initialize the service worker." });
-                    setIsSupported(false);
-                } finally {
-                    setIsLoading(false);
+                if (registration.active) {
+                    // If a worker is already active, we are good to go.
+                    checkWorkerState(registration.active);
+                } else if (registration.waiting) {
+                    // A worker is installed and waiting to become active.
+                    checkWorkerState(registration.waiting);
+                } else if (registration.installing) {
+                    // A new worker is installing.
+                    checkWorkerState(registration.installing);
                 }
-            };
-            
-            initializeServiceWorker();
+                
+                // Finally, check for an existing subscription.
+                return registration.pushManager.getSubscription();
+            }).then(subscription => {
+                console.log("[PushManager] Initial subscription state:", subscription);
+                setIsSubscribed(!!subscription);
+                setIsLoading(false);
+            }).catch(error => {
+                console.error("[PushManager] Service Worker initialization failed:", error);
+                toast.error("PWA features disabled.", { description: "Could not initialize the service worker." });
+                setIsSupported(false);
+                setIsLoading(false);
+            });
             
         } else {
             console.log("[PushManager] Browser does not support Service Workers or Push.");
@@ -74,7 +77,6 @@ export function usePushManager() {
     }, []);
 
     const subscribe = useCallback(async () => {
-        // Now, we check against the stateful swRegistration object.
         if (!swRegistration) {
             toast.error("Service Worker not ready.", { description: "The background service for notifications is still starting. Please try again in a moment." });
             return false;
@@ -95,7 +97,6 @@ export function usePushManager() {
 
         setIsLoading(true);
         try {
-            // Use the confirmed active registration to subscribe.
             const subscription = await swRegistration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
