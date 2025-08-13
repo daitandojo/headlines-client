@@ -1,4 +1,4 @@
-// src/app/layout.js (version 3.0)
+// src/app/layout.js (version 2.1)
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ export const metadata = {
   icons: {
     icon: '/icons/icon-192x192.png',
     shortcut: '/icons/icon-192x192.png',
+    // This is the critical line for iOS home screen icons.
     apple: '/icons/apple-touch-icon.png',
   },
   appleWebApp: {
@@ -43,69 +44,16 @@ export default function RootLayout({ children }) {
         <Toaster />
         <Script
           id="sw-registrar"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         >
           {`
-            if ('serviceWorker' in navigator && 'PushManager' in window) {
-              console.log('[SW] Browser supports Service Workers and Push');
-              
-              const registerSW = async () => {
-                try {
-                  console.log('[SW] Registering service worker...');
-                  
-                  const registration = await navigator.serviceWorker.register('/sw.js', {
-                    scope: '/',
-                    updateViaCache: 'none' // Always check for updates
-                  });
-                  
-                  console.log('[SW] Service Worker registered successfully:', registration);
-                  
-                  // Handle service worker updates
-                  registration.addEventListener('updatefound', () => {
-                    console.log('[SW] Service Worker update found');
-                    const newWorker = registration.installing;
-                    
-                    if (newWorker) {
-                      newWorker.addEventListener('statechange', () => {
-                        console.log('[SW] Service Worker state changed to:', newWorker.state);
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                          console.log('[SW] New service worker installed, page refresh recommended');
-                        }
-                      });
-                    }
-                  });
-                  
-                  // Listen for messages from the service worker
-                  navigator.serviceWorker.addEventListener('message', (event) => {
-                    console.log('[SW] Message from service worker:', event.data);
-                  });
-                  
-                } catch (error) {
-                  console.error('[SW] Service Worker registration failed:', error);
-                }
-              };
-              
-              // Register on page load
-              if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', registerSW);
-              } else {
-                registerSW();
-              }
-              
-              // Also check when page becomes visible (handles mobile app switching)
-              document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) {
-                  navigator.serviceWorker.getRegistrations().then(registrations => {
-                    if (registrations.length === 0) {
-                      console.log('[SW] No service worker found, re-registering...');
-                      registerSW();
-                    }
-                  });
-                }
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', () => {
+                navigator.serviceWorker
+                  .register('/sw.js')
+                  .then((registration) => console.log('Service Worker registered with scope:', registration.scope))
+                  .catch((error) => console.error('Service Worker registration failed:', error));
               });
-              
-            } else {
-              console.log('[SW] Browser does not support Service Workers or Push');
             }
           `}
         </Script>

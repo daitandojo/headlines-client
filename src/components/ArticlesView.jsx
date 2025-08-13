@@ -1,26 +1,43 @@
-// src/components/ArticlesView.jsx (version 1.3)
+// src/components/ArticlesView.jsx (version 2.0)
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { ArticleList } from '@/components/ArticleList';
 import { InfiniteScrollLoader } from '@/components/InfiniteScrollLoader';
 import { getArticles } from '@/actions/articles';
 import { ARTICLES_PER_PAGE } from '@/config/constants';
-import { useRealtimeUpdates } from '@/hooks/use-realtime-updates'; // NEW
+import { useRealtimeUpdates } from '@/hooks/use-realtime-updates';
+import { useAppStore } from '@/store/use-app-store';
 
 export function ArticlesView({ initialArticles, searchParams }) {
-    const [articles, setArticles] = useState(initialArticles);
+    // Get state and actions from the central store
+    const { articles, setInitialArticles, appendArticles, hydratedArticleSet } = useAppStore(state => ({
+        articles: state.articles,
+        setInitialArticles: state.setInitialArticles,
+        appendArticles: state.appendArticles,
+        hydratedArticleSet: state.hydratedArticleSet,
+    }));
+
+    // Local state for pagination control
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(initialArticles.length === ARTICLES_PER_PAGE);
     const [isLoading, setIsLoading] = useState(false);
     
-    useRealtimeUpdates(); // NEW: Activate real-time listener
+    // Activate the real-time listener
+    useRealtimeUpdates();
 
+    // Effect to hydrate the store with initial server-side data
+    // It runs only once per unique set of initial articles
     useEffect(() => {
-        setArticles(initialArticles);
-        setPage(1);
-        setHasMore(initialArticles.length === ARTICLES_PER_PAGE);
-    }, [initialArticles]);
+        const initialIds = new Set(initialArticles.map(a => a._id));
+        const isAlreadyHydrated = [...initialIds].every(id => hydratedArticleSet.has(id));
+        
+        if (!isAlreadyHydrated || articles.length === 0) {
+            setInitialArticles(initialArticles);
+            setPage(1);
+            setHasMore(initialArticles.length === ARTICLES_PER_PAGE);
+        }
+    }, [initialArticles, setInitialArticles, hydratedArticleSet, articles.length]);
 
     const loadMoreArticles = useCallback(async () => {
         if (isLoading || !hasMore) return;
@@ -34,7 +51,7 @@ export function ArticlesView({ initialArticles, searchParams }) {
         });
 
         if (newArticles.length > 0) {
-            setArticles(prev => [...prev, ...newArticles]);
+            appendArticles(newArticles); // Append to the central store
             setPage(nextPage);
         }
         
@@ -43,7 +60,7 @@ export function ArticlesView({ initialArticles, searchParams }) {
         }
         
         setIsLoading(false);
-    }, [isLoading, hasMore, page, searchParams]);
+    }, [isLoading, hasMore, page, searchParams, appendArticles]);
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">

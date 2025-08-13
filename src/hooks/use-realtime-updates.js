@@ -1,20 +1,21 @@
 // src/hooks/use-realtime-updates.js (version 2.0)
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import Pusher from 'pusher-js';
 import { toast } from 'sonner';
+import { useAppStore } from '@/store/use-app-store';
+import { Sparkles } from 'lucide-react';
 
 export function useRealtimeUpdates() {
-    const router = useRouter();
+    const { prependArticle, prependEvent } = useAppStore(state => ({
+        prependArticle: state.prependArticle,
+        prependEvent: state.prependEvent,
+    }));
     const pusherRef = useRef(null);
-    const channelRef = useRef(null);
-    const [connectionStatus, setConnectionStatus] = useState('connecting');
-    const reconnectTimeoutRef = useRef(null);
+    const channelsRef = useRef({});
 
     useEffect(() => {
-        // Ensure this only runs once and on the client
         if (pusherRef.current) return;
 
         const PUSHER_KEY = process.env.NEXT_PUBLIC_PUSHER_KEY;
@@ -22,120 +23,46 @@ export function useRealtimeUpdates() {
 
         if (!PUSHER_KEY || !PUSHER_CLUSTER) {
             console.warn("Pusher keys not found, real-time updates are disabled.");
-            setConnectionStatus('disabled');
             return;
         }
 
-        const initializePusher = () => {
-            try {
-                // Clear any existing reconnect timeout
-                if (reconnectTimeoutRef.current) {
-                    clearTimeout(reconnectTimeoutRef.current);
-                }
+        try {
+            pusherRef.current = new Pusher(PUSHER_KEY, { cluster: PUSHER_CLUSTER });
 
-                pusherRef.current = new Pusher(PUSHER_KEY, {
-                    cluster: PUSHER_CLUSTER,
-                    forceTLS: true,
-                    enabledTransports: ['ws', 'wss'],
-                    disabledTransports: ['xhr_polling', 'xhr_streaming', 'sockjs'],
-                    wsPort: 443,
-                    wssPort: 443,
-                    httpPort: 80,
-                    httpsPort: 443,
-                    enableStats: false,
-                    enableLogging: process.env.NODE_ENV === 'development'
+            // Subscribe to Articles Channel
+            channelsRef.current.articles = pusherRef.current.subscribe('articles-channel');
+            channelsRef.current.articles.bind('new-article', (data) => {
+                console.log('Real-time article received:', data);
+                prependArticle(data);
+                toast("New Article Received", {
+                    description: data.headline,
+                    icon: <Sparkles className="h-4 w-4 text-yellow-400" />,
                 });
+            });
 
-                // Connection event handlers
-                pusherRef.current.connection.bind('connecting', () => {
-                    console.log('[Pusher] Connecting...');
-                    setConnectionStatus('connecting');
+            // Subscribe to Events Channel
+            channelsRef.current.events = pusherRef.current.subscribe('events-channel');
+            channelsRef.current.events.bind('new-event', (data) => {
+                console.log('Real-time event received:', data);
+                prependEvent(data);
+                 toast("New Event Synthesized", {
+                    description: data.synthesized_headline,
+                    icon: <Sparkles className="h-4 w-4 text-blue-400" />,
                 });
+            });
 
-                pusherRef.current.connection.bind('connected', () => {
-                    console.log('[Pusher] Connected successfully');
-                    setConnectionStatus('connected');
-                });
+            console.log("Successfully subscribed to real-time data channels.");
 
-                pusherRef.current.connection.bind('disconnected', () => {
-                    console.log('[Pusher] Disconnected');
-                    setConnectionStatus('disconnected');
-                    
-                    // Auto-reconnect after 5 seconds
-                    reconnectTimeoutRef.current = setTimeout(() => {
-                        console.log('[Pusher] Attempting to reconnect...');
-                        if (pusherRef.current) {
-                            pusherRef.current.connect();
-                        }
-                    }, 5000);
-                });
+        } catch (error) {
+            console.error("Failed to initialize Pusher:", error);
+        }
 
-                pusherRef.current.connection.bind('error', (error) => {
-                    console.error('[Pusher] Connection error:', error);
-                    setConnectionStatus('error');
-                });
-
-                pusherRef.current.connection.bind('unavailable', () => {
-                    console.warn('[Pusher] Connection unavailable');
-                    setConnectionStatus('unavailable');
-                });
-
-                // Subscribe to channel
-                channelRef.current = pusherRef.current.subscribe('data-updates');
-
-                channelRef.current.bind('pusher:subscription_succeeded', () => {
-                    console.log('[Pusher] Successfully subscribed to real-time updates channel');
-                });
-
-                channelRef.current.bind('pusher:subscription_error', (error) => {
-                    console.error('[Pusher] Subscription error:', error);
-                });
-
-                channelRef.current.bind('data-changed', (data) => {
-                    console.log('[Pusher] Real-time event received:', data);
-                    toast.info("New intelligence has been added.", {
-                        description: "The view will now refresh automatically.",
-                        action: {
-                            label: 'Refresh Now',
-                            onClick: () => router.refresh(),
-                        },
-                    });
-                    // Soft-refresh the page to get new server-rendered data
-                    router.refresh();
-                });
-
-            } catch (error) {
-                console.error('[Pusher] Failed to initialize:', error);
-                setConnectionStatus('error');
-                
-                // Retry after 10 seconds
-                reconnectTimeoutRef.current = setTimeout(initializePusher, 10000);
-            }
-        };
-
-        // Initialize Pusher
-        initializePusher();
-
-        // Cleanup on component unmount
         return () => {
-            if (reconnectTimeoutRef.current) {
-                clearTimeout(reconnectTimeoutRef.current);
-            }
-            
-            if (channelRef.current) {
-                channelRef.current.unbind_all();
-                pusherRef.current?.unsubscribe('data-updates');
-                channelRef.current = null;
-            }
-            
             if (pusherRef.current) {
+                Object.values(channelsRef.current).forEach(channel => channel.unbind_all());
                 pusherRef.current.disconnect();
                 pusherRef.current = null;
             }
-            
-            setConnectionStatus('disconnected');
         };
-    }, [router]);
-
-    return { connectionStatus };
+    }, [prependArticle, prependEvent]);
 }
