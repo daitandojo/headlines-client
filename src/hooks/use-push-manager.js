@@ -1,4 +1,4 @@
-// src/hooks/use-push-manager.js (version 5.0)
+// src/hooks/use-push-manager.js (version 6.0)
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -28,47 +28,39 @@ export function usePushManager() {
 
             const initializePushManager = async () => {
                 setIsLoading(true);
-                console.log("[PushManager] Initializing... Waiting for service worker to be ready.");
+                console.log("[PushManager] Initializing. Waiting for service worker to become active...");
 
                 try {
-                    // The `navigator.serviceWorker.ready` promise is the most reliable signal.
-                    // It resolves with the registration when the service worker is active.
                     const readyPromise = navigator.serviceWorker.ready;
                     
-                    // Use an extended timeout to accommodate slower mobile devices (like iOS).
+                    // A generous timeout of 20 seconds, specifically for the slower first-time
+                    // activation on mobile devices, especially iOS.
                     const timeoutPromise = new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error("Service Worker readiness check timed out after 15 seconds.")), 15000)
+                        setTimeout(() => reject(new Error("Service worker activation timed out after 20 seconds.")), 20000)
                     );
 
-                    // Race the two promises. This prevents the app from waiting indefinitely.
                     const registration = await Promise.race([readyPromise, timeoutPromise]);
                     
-                    console.log("[PushManager] Service Worker is now active and ready:", registration);
+                    console.log("[PushManager] Service Worker is active and ready:", registration);
                     setSwRegistration(registration);
                     
-                    // Once we have a ready registration, check for an existing subscription.
                     const subscription = await registration.pushManager.getSubscription();
                     console.log("[PushManager] Initial subscription state:", subscription);
                     setIsSubscribed(!!subscription);
 
                 } catch (error) {
                     console.error("[PushManager] Initialization failed:", error);
-                    toast.error("Could not connect to the background notification service.", { 
-                        description: "This can happen during initial setup. Please try again in a moment."
+                    toast.error("Notification service failed to start.", { 
+                        description: "This can happen on first launch. Please try refreshing the app. If the issue persists, reinstalling the app may help."
                     });
-                    setIsSupported(false); // Gracefully disable the feature if initialization fails.
+                    setIsSupported(false);
                 } finally {
                     setIsLoading(false);
                     console.log("[PushManager] Initialization finished.");
                 }
             };
-
-            // Delay initialization slightly to allow the service worker registration process to start.
-            const timer = setTimeout(() => {
-                initializePushManager();
-            }, 100);
             
-            return () => clearTimeout(timer);
+            initializePushManager();
 
         } else {
             console.log("[PushManager] Browser does not support Service Workers or Push.");

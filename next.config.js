@@ -1,15 +1,7 @@
-// next.config.js (version 1.7)
-const withPWA = require('next-pwa')({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  // The 'disable' flag is removed to enable PWA features in development.
-  // We revert to `customWorkerDir`, which is the correct property for next-pwa@5.6.0.
-  customWorkerDir: 'worker', 
-});
-
+// next.config.js (version 4.0)
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // This is a clean, standard Next.js config with NO PWA wrappers.
   experimental: {
     serverActions: true,
   },
@@ -22,4 +14,4 @@ const nextConfig = {
   },
 };
 
-module.exports = withPWA(nextConfig);
+module.exports = nextConfig;

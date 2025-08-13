@@ -1,101 +1,72 @@
-/**
- * Copyright 2018 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *     http://www.apache.org/licenses/LICENSE-2.0
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// public/sw.js (version 2.0)
+// This is our new, simplified, hand-written service worker.
 
-// If the loader is already loaded, just stop.
-if (!self.define) {
-  let registry = {};
+self.addEventListener('push', (event) => {
+  console.log('[Service Worker] Push Received.');
+  console.log(`[Service Worker] Push had this data: "${event.data.text()}"`);
 
-  // Used for `eval` and `importScripts` where we can't get script URL by other means.
-  // In both cases, it's safe to use a global var because those functions are synchronous.
-  let nextDefineUri;
-
-  const singleRequire = (uri, parentUri) => {
-    uri = new URL(uri + ".js", parentUri).href;
-    return registry[uri] || (
-      
-        new Promise(resolve => {
-          if ("document" in self) {
-            const script = document.createElement("script");
-            script.src = uri;
-            script.onload = resolve;
-            document.head.appendChild(script);
-          } else {
-            nextDefineUri = uri;
-            importScripts(uri);
-            resolve();
-          }
-        })
-      
-      .then(() => {
-        let promise = registry[uri];
-        if (!promise) {
-          throw new Error(`Module ${uri} didn’t register its module`);
-        }
-        return promise;
-      })
-    );
-  };
-
-  self.define = (depsNames, factory) => {
-    const uri = nextDefineUri || ("document" in self ? document.currentScript.src : "") || location.href;
-    if (registry[uri]) {
-      // Module is already loading or loaded.
-      return;
-    }
-    let exports = {};
-    const require = depUri => singleRequire(depUri, uri);
-    const specialDeps = {
-      module: { uri },
-      exports,
-      require
+  let data;
+  try {
+    data = event.data.json();
+  } catch (e) {
+    console.error('[Service Worker] Failed to parse push data as JSON.');
+    data = {
+      title: 'New Update',
+      body: event.data.text(),
+      url: '/',
     };
-    registry[uri] = Promise.all(depsNames.map(
-      depName => specialDeps[depName] || require(depName)
-    )).then(deps => {
-      factory(...deps);
-      return exports;
-    });
+  }
+
+  const title = data.title || 'New Intelligence Alert';
+  const options = {
+    body: data.body || 'New content has been added.',
+    icon: data.icon || '/icons/icon-192x192.png',
+    badge: '/icons/icon-96x96.png',
+    vibrate: [100, 50, 100],
+    sound: '/sounds/notification.mp3', // Note: Sound is not supported on iOS for web push
+    data: {
+      url: data.url || '/',
+    },
+    actions: [
+      { action: 'view_event', title: 'View Event' },
+      { action: 'dismiss', title: 'Dismiss' }
+    ]
   };
-}
-define(['./workbox-e43f5367'], (function (workbox) { 'use strict';
 
-  importScripts("worker-development.js");
-  self.skipWaiting();
-  workbox.clientsClaim();
-  workbox.registerRoute("/", new workbox.NetworkFirst({
-    "cacheName": "start-url",
-    plugins: [{
-      cacheWillUpdate: async ({
-        request,
-        response,
-        event,
-        state
-      }) => {
-        if (response && response.type === 'opaqueredirect') {
-          return new Response(response.body, {
-            status: 200,
-            statusText: 'OK',
-            headers: response.headers
-          });
+  console.log('[Service Worker] Showing notification with options:', JSON.stringify(options));
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  console.log('[Service Worker] Notification click Received.', event.action);
+  const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
+
+  // Close the notification.
+  event.notification.close();
+
+  // If the action is 'dismiss', we do nothing further.
+  if (event.action === 'dismiss') {
+    console.log('[Service Worker] Dismiss action handled.');
+    return;
+  }
+
+  // For the 'view_event' action or a click on the notification body,
+  // focus an existing window or open a new one.
+  event.waitUntil(
+    self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true,
+    }).then((clientList) => {
+      if (clientList.length > 0) {
+        let client = clientList[0];
+        for (let i = 0; i < clientList.length; i++) {
+          if (clientList[i].focused) {
+            client = clientList[i];
+          }
         }
-        return response;
+        return client.focus().then(c => c.navigate(urlToOpen));
       }
-    }]
-  }), 'GET');
-  workbox.registerRoute(/.*/i, new workbox.NetworkOnly({
-    "cacheName": "dev",
-    plugins: []
-  }), 'GET');
-
-}));
-//# sourceMappingURL=sw.js.map
+      return self.clients.openWindow(urlToOpen);
+    })
+  );
+});
