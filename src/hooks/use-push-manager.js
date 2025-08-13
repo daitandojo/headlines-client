@@ -1,4 +1,4 @@
-// src/hooks/use-push-manager.js (version 2.1)
+// src/hooks/use-push-manager.js (version 2.2)
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -19,27 +19,53 @@ export function usePushManager() {
     const [isSupported, setIsSupported] = useState(false);
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [registration, setRegistration] = useState(null);
+    // State to hold the active service worker registration
+    const [swRegistration, setSwRegistration] = useState(null);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
             console.log("[PushManager] Browser supports Service Workers and Push.");
             setIsSupported(true);
 
-            navigator.serviceWorker.register('/sw.js').then(reg => {
-                console.log("[PushManager] Service Worker registered successfully:", reg);
-                setRegistration(reg);
-                return reg.pushManager.getSubscription();
-            }).then(subscription => {
-                console.log("[PushManager] Initial subscription state:", subscription);
-                setIsSubscribed(!!subscription);
-                setIsLoading(false);
-            }).catch(error => {
-                console.error("[PushManager] Service Worker registration failed:", error);
-                toast.error("PWA features disabled.", { description: "Could not register the service worker." });
-                setIsSupported(false);
-                setIsLoading(false);
-            });
+            // --- ROBUST SERVICE WORKER INITIALIZATION ---
+            const initializeServiceWorker = async () => {
+                try {
+                    // 1. Register the service worker.
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    console.log("[PushManager] Service Worker registration successful:", registration);
+                    
+                    // 2. Wait for the service worker to become active. This is the crucial step.
+                    // If there's an active worker, use it. Otherwise, wait for the new one to activate.
+                    if (registration.active) {
+                        console.log("[PushManager] Service worker is already active.");
+                        setSwRegistration(registration);
+                    } else {
+                        console.log("[PushManager] Waiting for new service worker to activate...");
+                        // Listen for the 'controllerchange' event which signals a new worker has taken control.
+                        navigator.serviceWorker.addEventListener('controllerchange', () => {
+                            if (navigator.serviceWorker.controller) {
+                                console.log("[PushManager] New service worker has activated.");
+                                setSwRegistration(navigator.serviceWorker.controller.registration);
+                            }
+                        });
+                    }
+                    
+                    // 3. Check for an existing subscription.
+                    const subscription = await registration.pushManager.getSubscription();
+                    console.log("[PushManager] Initial subscription state:", subscription);
+                    setIsSubscribed(!!subscription);
+
+                } catch (error) {
+                    console.error("[PushManager] Service Worker initialization failed:", error);
+                    toast.error("PWA features disabled.", { description: "Could not initialize the service worker." });
+                    setIsSupported(false);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            
+            initializeServiceWorker();
+            
         } else {
             console.log("[PushManager] Browser does not support Service Workers or Push.");
             setIsSupported(false);
@@ -48,8 +74,9 @@ export function usePushManager() {
     }, []);
 
     const subscribe = useCallback(async () => {
-        if (!registration) {
-            toast.error("Service Worker not ready.", { description: "Please try again in a moment." });
+        // Now, we check against the stateful swRegistration object.
+        if (!swRegistration) {
+            toast.error("Service Worker not ready.", { description: "The background service for notifications is still starting. Please try again in a moment." });
             return false;
         }
 
@@ -68,7 +95,8 @@ export function usePushManager() {
 
         setIsLoading(true);
         try {
-            const subscription = await registration.pushManager.subscribe({
+            // Use the confirmed active registration to subscribe.
+            const subscription = await swRegistration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
             });
@@ -85,8 +113,6 @@ export function usePushManager() {
             toast.success("Notifications enabled!");
             return true;
         } catch (error) {
-            // --- ENHANCED ERROR HANDLING ---
-            // Log the full error object for detailed inspection.
             console.error("[PushManager] Full subscription error object:", error);
             
             let errorMessage = "An unexpected error occurred.";
@@ -97,15 +123,13 @@ export function usePushManager() {
             if (error.name === 'NotAllowedError') {
                  toast.error("Permission denied.", { description: "You did not grant permission for notifications." });
             } else {
-                 // Display the specific error message to the user.
                  toast.error("Failed to enable notifications.", { description: errorMessage });
             }
             return false;
-            // --- END ENHANCED ERROR HANDLING ---
         } finally {
             setIsLoading(false);
         }
-    }, [registration]);
+    }, [swRegistration]);
 
     return { isSupported, isSubscribed, isLoading, subscribe };
 }
