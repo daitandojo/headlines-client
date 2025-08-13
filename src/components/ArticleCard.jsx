@@ -1,4 +1,4 @@
-// src/components/ArticleCard.jsx (version 1.1)
+// src/components/ArticleCard.jsx (version 2.0)
 "use client";
 
 import { useTransition } from "react";
@@ -42,71 +42,73 @@ export const ArticleCard = ({ article }) => {
       className={`border-slate-700 rounded-xl bg-gradient-to-br from-slate-900 to-slate-800/60 shadow-lg shadow-black/40 transition-all duration-300 hover:shadow-xl hover:shadow-blue-900/30 hover:border-blue-500/50 hover:-translate-y-1 ${isPending ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <TooltipProvider delayDuration={100}>
-        <div className="flex items-start gap-4 p-4">
-          <div className="flex flex-col items-center gap-y-2 shrink-0">
-            <Badge className={`text-base font-bold px-3 py-1 ${getRelevanceBadgeClass(relevanceScore)}`}>
-              {relevanceScore}
-            </Badge>
-            <div className="flex gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={() => window.open(article.link, '_blank')} className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 h-8 w-8">
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Open in new tab</TooltipContent>
-              </Tooltip>
-              <AlertDialog>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" disabled={isPending} className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8">
-                        <Trash2 className="h-4 w-4" />
+        <div className="p-4">
+            {/* --- RESPONSIVE HEADER --- */}
+            <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                    <Badge className={`text-sm font-bold px-2.5 py-1 ${getRelevanceBadgeClass(relevanceScore)}`}>
+                      {relevanceScore}
+                    </Badge>
+                    <span className="text-lg hidden sm:inline">{flag}</span>
+                    <p className="text-xs sm:text-sm text-slate-400 truncate">{article.newspaper}</p>
+                </div>
+                <div className="flex items-center flex-shrink-0">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" onClick={() => window.open(article.link, '_blank')} className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 h-8 w-8">
+                        <ExternalLink className="h-4 w-4" />
                       </Button>
-                    </AlertDialogTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>Delete article</TooltipContent>
-                </Tooltip>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>This will permanently delete the article from the database.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete}>Continue</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                    </TooltipTrigger>
+                    <TooltipContent>Open in new tab</TooltipContent>
+                  </Tooltip>
+                  <AlertDialog>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" disabled={isPending} className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete article</TooltipContent>
+                    </Tooltip>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>This will permanently delete the article from the database.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete}>Continue</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
             </div>
-          </div>
-          <AccordionTrigger className="flex-grow p-0 hover:no-underline text-left">
-            <div className="flex-grow min-w-0">
-              <p className="font-serif font-bold text-lg text-slate-100 line-clamp-2">{article.headline_en || article.headline}</p>
-              <div className="flex items-center justify-between text-sm text-slate-400 mt-1">
-                <p className="flex items-center">
-                  <span className="text-lg mr-2">{flag}</span>
-                  {article.newspaper}
+
+            <AccordionTrigger className="p-0 hover:no-underline text-left">
+              <div className="flex-grow min-w-0">
+                <p className="font-serif font-bold text-base sm:text-lg text-slate-100 line-clamp-3">
+                  <span className="text-lg sm:hidden mr-2">{flag}</span>
+                  {article.headline_en || `(en N/S): ${article.headline}`}
                 </p>
-                <p className="text-xs text-slate-500 font-mono">{formattedDate}</p>
               </div>
-            </div>
-          </AccordionTrigger>
+            </AccordionTrigger>
         </div>
       </TooltipProvider>
 
-      <AccordionContent className="p-6 pt-0">
-        <div className="border-t border-slate-700/50 pt-6 space-y-6">
+      <AccordionContent className="p-4 pt-0">
+        <div className="border-t border-slate-700/50 pt-4 mt-2 space-y-4">
           {article.assessment_article && (
             <div>
-              <h4 className="font-semibold text-md text-slate-300 mb-2">Intelligence Analysis</h4>
-              <p className="text-slate-400 italic break-words">"{article.assessment_article}"</p>
+              <h4 className="font-semibold text-sm text-slate-300 mb-1">Intelligence Analysis</h4>
+              <p className="text-sm text-slate-400 italic break-words">"{article.assessment_article}"</p>
             </div>
           )}
           {article.key_individuals && article.key_individuals.length > 0 && (
             <div>
-              <h4 className="font-semibold text-md text-slate-300 mb-2">Key Individuals & Contacts</h4>
-              <ul className="list-disc list-inside text-slate-400">
+              <h4 className="font-semibold text-sm text-slate-300 mb-1">Key Individuals & Contacts</h4>
+              <ul className="list-disc list-inside text-sm text-slate-400">
                 {article.key_individuals.map(person => (
                   <li key={person.name}>
                     <strong>{person.name}</strong> ({person.role_in_event} at {person.company})

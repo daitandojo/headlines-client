@@ -1,4 +1,4 @@
-// src/components/GlobalFilters.jsx (version 1.2)
+// src/components/GlobalFilters.jsx (version 1.3)
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -55,8 +55,8 @@ export function GlobalFilters({ uniqueCountries }) {
   return (
     <Card className="mb-8 bg-black/20 backdrop-blur-sm border-white/10 shadow-lg shadow-black/30">
         <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="space-y-1.5 md:col-span-3 lg:col-span-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                <div className="space-y-1.5 md:col-span-2 lg:col-span-3">
                     <Label htmlFor="search" className="text-slate-300">Search</Label>
                     <Input id="search" placeholder="Search by name, company, or keyword..." value={filters.q} onChange={(e) => handleFilterChange('q', e.target.value)} className="bg-slate-900/80 border-slate-700"/>
                 </div>

@@ -909,17 +909,57 @@ const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 const pineconeIndex = pc.index(process.env.PINECONE_INDEX_NAME);
 
 // --- Models & Config ---
+const QUERY_REWRITER_MODEL = 'openai/gpt-oss-20b'; // A smaller, faster model is fine for this
 const ENTITY_EXTRACTOR_MODEL = 'openai/gpt-oss-120b';
 const GENERATION_MODEL = 'openai/gpt-oss-120b';
 const FACT_CHECKER_MODEL = 'openai/gpt-oss-120b';
-const SIMILARITY_THRESHOLD = 0.45;
+// CORRECTED: Lowered the threshold to improve recall.
+const SIMILARITY_THRESHOLD = 0.38;
 const HIGH_CONFIDENCE_THRESHOLD = 0.75;
 
 // --- Agent Prompts ---
-const ENTITY_EXTRACTOR_PROMPT = `You are an entity extraction agent. Your task is to identify the 1-2 most important proper nouns (people, companies, places) from the "User's Question" that are essential for research.
+const QUERY_REWRITER_PROMPT = `You are a query rewriting expert. Your task is to take a conversation history and the latest user question, and rewrite the question into a single, standalone query that is optimal for a vector database search.
+
+- If the latest question is already a complete, standalone question, use it as is.
+- If the latest question is a follow-up (e.g., "what about him?", "and his wife?"), combine it with context from the history.
+- The rewritten query should be concise and contain all the necessary keywords.
+
+Example 1:
+History:
+"assistant: Bestseller was founded by Troels Holch Povlsen."
+"user: What is his net worth?"
+Rewritten Query: "What is Troels Holch Povlsen's net worth?"
+
+Example 2:
+History:
+"user: Tell me about Bestseller."
+"assistant: Bestseller is a fashion company..."
+"user: Who founded it?"
+Rewritten Query: "Who founded the Bestseller company?"
+
+Respond ONLY with the rewritten query, with no extra text or quotes.`;
+
+const ENTITY_EXTRACTOR_PROMPT = `You are a highly intelligent entity extraction and disambiguation agent. Your task is to analyze the "User's Question" and identify the 1-2 most important proper nouns (people, companies, specific events).
+
+CRITICAL INSTRUCTIONS:
+1.  **Disambiguate the entity type.** If the entity is a company, append "(company)". If it is a person, append "(person)".
+2.  Be precise and return only the essential search term.
+
+Example 1:
+User's Question: "Who founded Bestseller?"
+Your Output: { "entities": ["Bestseller (company)"] }
+
+Example 2:
+User's Question: "Tell me about Troels Holch Povlsen"
+Your Output: { "entities": ["Troels Holch Povlsen (person)"] }
+
+Example 3:
+User's Question: "What is the history of Nine United?"
+Your Output: { "entities": ["Nine United (company)"] }
+
 Respond ONLY with a valid JSON object: { "entities": ["Entity 1", "Entity 2"] }`;
 
-const GENERATOR_PROMPT = `You are an elite intelligence analyst. Your primary directive is to synthesize ONLY the provided context to answer the "User's Question".
+const getGeneratorPrompt = (sourceValidation) => `You are an elite intelligence analyst. Your primary directive is to synthesize ONLY the provided context to answer the "User's Question".
 
 **CRITICAL RULES:**
 1. You MUST ONLY use information explicitly provided in the context sources below
@@ -979,18 +1019,15 @@ Generate a helpful response that:
 Be specific about what you looked for and what would be needed to answer their question.`;
 
 // Helper function to assess context quality
-// Enhanced helper function to assess context quality with better scoring
 function assessContextQuality(ragResults, wikiResults, question) {
     const ragScore = ragResults.length > 0 ? Math.max(...ragResults.map(r => r.score)) : 0;
     
-    // Better Wikipedia scoring based on content quality
     const highQualityWiki = wikiResults.filter(r => r.validation?.quality === 'high').length;
     const mediumQualityWiki = wikiResults.filter(r => r.validation?.quality === 'medium').length;
     const wikiScore = highQualityWiki > 0 ? 0.7 : (mediumQualityWiki > 0 ? 0.5 : 0);
     
     const combinedScore = Math.max(ragScore, wikiScore);
     
-    // Enhanced confidence assessment
     const hasMultipleSources = ragResults.length > 0 && wikiResults.length > 0;
     const hasHighQualityContent = ragScore >= HIGH_CONFIDENCE_THRESHOLD || highQualityWiki > 0;
     
@@ -1031,13 +1068,33 @@ async function validateResponse(response, sources, originalQuestion) {
 
 export async function POST(req) {
     const overallTimer = await startTimer('overall_request');
+    let latestUserMessage;
     
     try {
         const { messages } = await req.json();
-        const latestUserMessage = messages[messages.length - 1].content;
+        let queryForRetrieval = messages[messages.length - 1].content;
 
-        // 1. Entity Extraction Agent
-        const entityTimer = startTimer('entity_extraction');
+        if (messages.length > 1) {
+            const conversationHistory = messages.slice(-5, -1)
+                .map(m => `${m.role}: ${m.content}`)
+                .join('\n');
+            
+            const rewriteResponse = await groq.chat.completions.create({
+                model: QUERY_REWRITER_MODEL,
+                messages: [
+                    { role: 'system', content: QUERY_REWRITER_PROMPT },
+                    { role: 'user', content: `History:\n${conversationHistory}\n\nLatest question: "${queryForRetrieval}"` }
+                ],
+                temperature: 0.0
+            });
+            const rewrittenQuery = rewriteResponse.choices[0].message.content.trim();
+            console.log(`[Query Rewriter] Original: "${queryForRetrieval}" | Rewritten: "${rewrittenQuery}"`);
+            queryForRetrieval = rewrittenQuery;
+        }
+        
+        latestUserMessage = queryForRetrieval;
+
+        const entityTimer = await startTimer('entity_extraction');
         const entityResponse = await groq.chat.completions.create({
             model: ENTITY_EXTRACTOR_MODEL,
             messages: [
@@ -1047,15 +1104,24 @@ export async function POST(req) {
             response_format: { type: 'json_object' },
         });
         const { entities } = JSON.parse(entityResponse.choices[0].message.content);
-        entityTimer.end();
-        console.log(`[Entity Agent] Extracted: ${entities.join(', ')}`);
+        await entityTimer.end();
+        console.log(`[Entity Agent] Extracted & Disambiguated: ${entities.join(', ')}`);
 
-        // 2. Enhanced RAG with query expansion
-        const ragTimer = startTimer('rag_retrieval');
-        const queryEmbeddings = await generateQueryEmbeddings(latestUserMessage);
+        const ragTimer = await startTimer('rag_retrieval');
         
-        // Query Pinecone with multiple embeddings for better recall
-        const pineconePromises = queryEmbeddings.map(embedding => 
+        const fullQueryEmbeddingsPromise = generateQueryEmbeddings(latestUserMessage);
+        
+        const entityEmbeddingsPromise = entities.length > 0 ? generateQueryEmbeddings(entities[0]) : Promise.resolve([]);
+
+        const [fullQueryEmbeddings, entityEmbeddings] = await Promise.all([
+            fullQueryEmbeddingsPromise,
+            entityEmbeddingsPromise
+        ]);
+
+        const allQueryEmbeddings = [...fullQueryEmbeddings, ...entityEmbeddings];
+        console.log(`[RAG] Performing search with ${allQueryEmbeddings.length} embedding vectors.`);
+
+        const pineconePromises = allQueryEmbeddings.map(embedding => 
             pineconeIndex.query({ 
                 topK: 3, 
                 vector: embedding, 
@@ -1063,56 +1129,40 @@ export async function POST(req) {
             })
         );
         
-        // Batch fetch Wikipedia data
-        const wikiTimer = startTimer('wikipedia_fetch');
+        const wikiTimer = await startTimer('wikipedia_fetch');
         const wikiPromise = fetchBatchWikipediaSummaries(entities);
         
         const [pineconeResponses, wikiResults] = await Promise.all([
             Promise.all(pineconePromises),
             wikiPromise
         ]);
-        ragTimer.end();
-        wikiTimer.end();
+        await ragTimer.end();
+        await wikiTimer.end();
         
-        // 3. Merge and deduplicate results from multiple queries
-        const allMatches = [];
+        const uniqueMatches = new Map();
         pineconeResponses.forEach(response => {
-            response.matches.forEach(match => {
-                // Avoid duplicates by checking metadata
-                const existing = allMatches.find(m => 
-                    m.metadata.headline === match.metadata.headline
-                );
-                if (!existing || match.score > existing.score) {
-                    if (existing) {
-                        // Replace with higher scoring version
-                        const index = allMatches.indexOf(existing);
-                        allMatches[index] = match;
-                    } else {
-                        allMatches.push(match);
+            if (response && response.matches) {
+                response.matches.forEach(match => {
+                    if (!uniqueMatches.has(match.id) || match.score > uniqueMatches.get(match.id).score) {
+                        uniqueMatches.set(match.id, match);
                     }
-                }
-            });
+                });
+            }
         });
         
-        // Sort by relevance and filter
-        const relevantPineconeResults = allMatches
+        const relevantPineconeResults = Array.from(uniqueMatches.values())
             .filter(match => match.score >= SIMILARITY_THRESHOLD)
             .sort((a, b) => b.score - a.score)
-            .slice(0, 5); // Keep top 5 results
+            .slice(0, 5);
             
-        // Validate and filter Wikipedia results
         const validWikiResults = [];
         for (const res of wikiResults.filter(r => r.success)) {
             const validation = await validateWikipediaContent(res.summary);
             if (validation.valid) {
-                validWikiResults.push({
-                    ...res,
-                    validation
-                });
+                validWikiResults.push({ ...res, validation });
             }
         }
             
-        // Add cross-validation between sources
         const sourceValidation = crossValidateSources(relevantPineconeResults, validWikiResults, latestUserMessage);
         console.log(`[Source Validation] Conflicts: ${sourceValidation.conflicts.length}, Confirmations: ${sourceValidation.confirmations.length}`);
         
@@ -1127,7 +1177,6 @@ export async function POST(req) {
         ]);
         console.log(`[Cache Stats] Embeddings: ${JSON.stringify(embeddingStats)}, Wikipedia: ${JSON.stringify(wikiStats)}`);
         
-        // 4. Handle insufficient context case
         if (!contextQuality.hasSufficientContext) {
             const insufficientDataResponse = INSUFFICIENT_DATA_PROMPT
                 .replace('{question}', latestUserMessage)
@@ -1144,7 +1193,6 @@ export async function POST(req) {
             return new StreamingTextResponse(stream);
         }
 
-        // 5. Assemble high-quality context
         const dbContext = relevantPineconeResults.length > 0 
             ? relevantPineconeResults.map(match => 
                 `- [Similarity: ${match.score.toFixed(3)}] ${match.metadata.headline}: ${match.metadata.summary}`
@@ -1155,7 +1203,6 @@ export async function POST(req) {
             .map(res => `- [Quality: ${res.validation.quality}] ${res.title}: ${res.summary}`)
             .join('\n');
 
-        // 6. Enhanced prompt with context quality info
         const contextInfo = `Context Quality Assessment:
 - Internal Database: ${contextQuality.ragResultCount} documents (max similarity: ${contextQuality.maxSimilarity.toFixed(3)})
 - Wikipedia: ${validWikiResults.length} high-quality articles
@@ -1173,19 +1220,18 @@ User's Question:
 
 IMPORTANT: Base your answer ONLY on the context provided above. If information is missing, explicitly state what additional information would be needed.`;
 
-        // 7. Generate response with strict sourcing
+        const generatorPrompt = getGeneratorPrompt(sourceValidation);
+
         const messagesForApi = [...messages.slice(0, -1), { role: 'user', content: contextInfo }];
         
-        // For high-stakes queries, use comprehensive quality control
         if (contextQuality.hasHighConfidenceRAG) {
             const response = await groq.chat.completions.create({
                 model: GENERATION_MODEL,
-                messages: [{ role: 'system', content: GENERATOR_PROMPT }, ...messagesForApi],
+                messages: [{ role: 'system', content: generatorPrompt }, ...messagesForApi],
             });
             
             const generatedContent = response.choices[0].message.content;
             
-            // Comprehensive quality control
             const allSources = [...relevantPineconeResults, ...validWikiResults];
             const hallucinationReport = detectHallucinations(generatedContent, allSources);
             
@@ -1202,7 +1248,6 @@ IMPORTANT: Base your answer ONLY on the context provided above. If information i
             if (qualityReport.recommendation === 'reject' || hallucinationReport.recommendation === 'reject') {
                 console.log(`[Quality Control] Response rejected. Issues: ${[...qualityReport.weaknesses, ...hallucinationReport.suspiciousStatements.map(s => s.reason)].join(', ')}`);
                 
-                // Generate a conservative fallback response
                 const fallbackPrompt = `The previous response was flagged for quality issues. Please provide a very conservative answer that:
 1. Only states facts explicitly found in the sources
 2. Acknowledges any limitations or gaps in information
@@ -1214,21 +1259,18 @@ ${contextInfo}`;
                 const fallbackResponse = await groq.chat.completions.create({
                     model: GENERATION_MODEL,
                     stream: true,
-                    messages: [{ role: 'system', content: GENERATOR_PROMPT }, { role: 'user', content: fallbackPrompt }],
+                    messages: [{ role: 'system', content: generatorPrompt }, { role: 'user', content: fallbackPrompt }],
                 });
                 
                 const stream = OpenAIStream(fallbackResponse);
                 return new StreamingTextResponse(stream);
             }
             
-            // Add confidence disclaimer and quality notes to approved response
             const disclaimer = generateConfidenceDisclaimer(contextQuality, sourceValidation);
             const enhancedResponse = `${disclaimer}\n\n${generatedContent}`;
             
-            // Log quality metrics for monitoring
             console.log(`[Quality Metrics] Hallucination Score: ${hallucinationReport.confidenceScore}, Source Validation: ${sourceValidation.reliability}`);
             
-            // Log comprehensive analytics
             const responseTime = await overallTimer.end();
             await logQuery({
                 query: latestUserMessage,
@@ -1243,7 +1285,6 @@ ${contextInfo}`;
                 sourceConflicts: sourceValidation.conflicts.length
             });
             
-            // Check for system alerts
             const alerts = await checkAlerts();
             if (alerts.length > 0) {
                 console.warn(`[SYSTEM ALERTS] ${alerts.length} active alerts:`, alerts.map(a => a.message).join('; '));
@@ -1259,10 +1300,8 @@ ${contextInfo}`;
                 }
             });
         } else {
-            // For lower confidence, use streaming with enhanced monitoring
             console.log(`[Streaming Mode] Using streaming response due to medium/low confidence context`);
             
-            // Add confidence disclaimer to the prompt
             const disclaimer = generateConfidenceDisclaimer(contextQuality, sourceValidation);
             const enhancedContextInfo = `${disclaimer}\n\n${contextInfo}\n\nIMPORTANT: Start your response with the confidence level and be explicit about limitations.`;
             const messagesForStreamingApi = [...messages.slice(0, -1), { role: 'user', content: enhancedContextInfo }];
@@ -1270,7 +1309,7 @@ ${contextInfo}`;
             const response = await groq.chat.completions.create({
                 model: GENERATION_MODEL,
                 stream: true,
-                messages: [{ role: 'system', content: GENERATOR_PROMPT }, ...messagesForStreamingApi],
+                messages: [{ role: 'system', content: generatorPrompt }, ...messagesForStreamingApi],
             });
 
             const stream = OpenAIStream(response);
@@ -1286,7 +1325,6 @@ ${contextInfo}`;
         const responseTime = await overallTimer.end({ error: true });
         console.error('[CHAT API ERROR]', error);
         
-        // Log error for analytics
         await logQuery({
             query: latestUserMessage || 'unknown',
             entities: [],
@@ -1842,7 +1880,7 @@ export const ArticleCard = ({ article }) => {
           </div>
           <AccordionTrigger className="flex-grow p-0 hover:no-underline text-left">
             <div className="flex-grow min-w-0">
-              <p className="font-serif font-bold text-lg text-slate-100 line-clamp-2">{article.headline_en || article.headline}</p>
+              <p className="font-serif font-bold text-lg text-slate-100 line-clamp-2">{article.headline_en || `(en N/S): ${article.headline}`}</p>
               <div className="flex items-center justify-between text-sm text-slate-400 mt-1">
                 <p className="flex items-center">
                   <span className="text-lg mr-2">{flag}</span>
@@ -4455,7 +4493,7 @@ export async function generateQueryEmbeddings(originalQuery) {
     
     try {
         const embeddings = await Promise.all(embeddingPromises);
-        console.log(`[Query Expansion] Generated ${embeddings.length} query variations`);
+        console.log(`[Query Expansion] Generated ${embeddings.length} query variations for: "${originalQuery}" ->`, variations);
         return embeddings;
     } catch (error) {
         console.error(`[Query Expansion Error] ${error.message}`);
@@ -4470,35 +4508,55 @@ export async function generateQueryEmbeddings(originalQuery) {
  * @returns {Array<string>}
  */
 function generateQueryVariations(query) {
-    const variations = [query]; // Always include original
-    
-    // Add question variations
-    if (!query.toLowerCase().includes('what') && !query.toLowerCase().includes('who')) {
-        variations.push(`What is ${query}?`);
-        variations.push(`Who is ${query}?`);
+    const originalQuery = query.trim();
+    const variations = new Set([originalQuery]);
+
+    // CORRECTED: Smartly strip disambiguation tags for broader searches
+    const coreEntity = originalQuery.replace(/\s*\((company|person)\)$/, '').trim();
+    if (coreEntity !== originalQuery) {
+        variations.add(coreEntity);
+    }
+
+    // Pattern for "Who founded X?"
+    const हूंFounderMatch = coreEntity.toLowerCase().match(/^(?:who|what)\s+(?:is|was|founded|created)\s+(.+)/);
+    if ( हूंFounderMatch) {
+        let subject = हूंFounderMatch[1].replace(/\?/g, '').replace(/^(the|a|an)\s/,'').trim();
+        variations.add(subject);
+        variations.add(`${subject} founder`);
+        variations.add(`founder of ${subject}`);
+        variations.add(`${subject} history`);
+    } else {
+        // General question pattern
+        const questionMatch = coreEntity.toLowerCase().match(/^(who|what|when|where|why|how)\s(is|are|was|were|did|does|do)\s(.+)/);
+        if (questionMatch) {
+            let subject = questionMatch[3].replace(/\?/g, '').trim();
+            variations.add(subject);
+            
+            const simplified = subject.replace(/^(the|a|an)\s/,'').split(' of ');
+            if (simplified.length > 1) {
+                variations.add(`${simplified[1].trim()} ${simplified[0].trim()}`);
+            }
+        }
     }
     
-    // Add context variations
-    if (!query.toLowerCase().includes('information about')) {
-        variations.push(`Information about ${query}`);
+    // Add generic variations for the core entity
+    if (hasProperNouns(coreEntity)) {
+        variations.add(`${coreEntity} background details`);
+        variations.add(`Information about ${coreEntity}`);
     }
     
-    // Add business context if it seems like a company/person query
-    if (hasProperNouns(query)) {
-        variations.push(`${query} company business`);
-        variations.push(`${query} background details`);
-    }
-    
-    // Limit to 3 variations to avoid noise
-    return variations.slice(0, 3);
+    // Return the top 4 most distinct variations
+    return Array.from(variations).slice(0, 4);
 }
 
+
 /**
- * Simple check for proper nouns (capitalized words)
+ * Simple check for proper nouns (capitalized words not at the start of a sentence)
  * @param {string} text 
  * @returns {boolean}
  */
 function hasProperNouns(text) {
+    // Looks for words starting with an uppercase letter
     return /\b[A-Z][a-z]+/.test(text);
 }
 
@@ -5085,7 +5143,63 @@ export async function startTimer(operation) {
 
 # File: src/lib/qualityControl.js
 // src/lib/qualityControl.js - Comprehensive quality control system
-"use server";
+
+// --- Helper Functions (Stubs for now, can be expanded) ---
+
+/**
+ * A very simple NLP-like function to extract "entities" from text.
+ * In a real system, this would use a proper NER model.
+ * @param {string} text - The text to extract from.
+ * @returns {Array<{name: string, facts: string[]}>}
+ */
+function simpleEntityExtractor(text, sourceIdentifier) {
+    // This is a placeholder. A real implementation would be much more complex.
+    // For now, let's assume the first capitalized phrase is the entity.
+    const match = text.match(/([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)/);
+    if (match) {
+        return [{ name: match[0], facts: [text] }];
+    }
+    return [{ name: sourceIdentifier, facts: [text] }];
+}
+
+function extractEntitiesFromRAG(ragResults) {
+    if (!ragResults) return [];
+    return ragResults.flatMap(r => simpleEntityExtractor(r.metadata?.summary || '', r.metadata?.headline || 'RAG Source'));
+}
+
+function extractEntitiesFromWiki(wikiResults) {
+    if (!wikiResults) return [];
+    return wikiResults.flatMap(w => simpleEntityExtractor(w.summary || '', w.title || 'Wiki Source'));
+}
+
+/**
+ * A basic string similarity check.
+ * @param {{name: string}} entityA
+ * @param {{name: string}} entityB
+ * @returns {number} - Similarity score from 0 to 1
+ */
+function entitySimilarity(entityA, entityB) {
+    const nameA = entityA.name.toLowerCase();
+    const nameB = entityB.name.toLowerCase();
+    if (nameA.includes(nameB) || nameB.includes(nameA)) {
+        return 0.9;
+    }
+    return 0; // Keep it simple
+}
+
+/**
+ * Placeholder for fact conflict detection.
+ * @param {string[]} factsA
+ * @param {string[]} factsB
+ * @returns {boolean}
+ */
+function factsConflict(factsA, factsB) {
+    // This is extremely complex. A real implementation would use NLI models.
+    // For now, we'll assume no conflicts to avoid false positives.
+    return false;
+}
+
+// --- Exported Functions ---
 
 /**
  * Cross-validates information between RAG and Wikipedia sources
@@ -5094,7 +5208,7 @@ export async function startTimer(operation) {
  * @param {string} query 
  * @returns {Object} Validation report
  */
-export async function crossValidateSources(ragResults, wikiResults, query) {
+export function crossValidateSources(ragResults, wikiResults, query) {
     const validation = {
         conflicts: [],
         confirmations: [],
@@ -5102,13 +5216,16 @@ export async function crossValidateSources(ragResults, wikiResults, query) {
         reliability: 'unknown'
     };
 
-    // Extract key entities and facts from both sources
+    if (!ragResults || !wikiResults || ragResults.length === 0 || wikiResults.length === 0) {
+        validation.reliability = 'single_source';
+        return validation;
+    }
+
     const ragEntities = extractEntitiesFromRAG(ragResults);
     const wikiEntities = extractEntitiesFromWiki(wikiResults);
 
-    // Look for conflicts and confirmations
     ragEntities.forEach(ragEntity => {
-        const matchingWiki = wikiEntities.find(wiki => 
+        const matchingWiki = wikiEntities.find(wiki =>
             entitySimilarity(ragEntity, wiki) > 0.8
         );
 
@@ -5128,7 +5245,166 @@ export async function crossValidateSources(ragResults, wikiResults, query) {
             }
         }
     });
-};
+
+    if (validation.conflicts.length > 0) {
+        validation.reliability = 'conflicting';
+    } else if (validation.confirmations.length > 0) {
+        validation.reliability = 'confirmed';
+    } else {
+        validation.reliability = 'unconfirmed';
+    }
+    
+    const totalEntities = (ragEntities.length + wikiEntities.length) / 2;
+    if (totalEntities > 0) {
+        validation.confidence = validation.confirmations.length / totalEntities;
+    }
+
+    return validation;
+}
+
+
+/**
+ * A simple heuristic-based hallucination detector.
+ * @param {string} responseText The generated response.
+ * @param {Array} sources The source documents (RAG results + Wiki results).
+ * @returns {Object} A hallucination report.
+ */
+export function detectHallucinations(responseText, sources) {
+    const combinedSourceText = sources
+        .map(s => s.metadata?.summary || s.summary || '')
+        .join(' ')
+        .toLowerCase();
+    
+    const sentences = responseText.split('.').filter(s => s.trim().length > 0);
+    const suspiciousStatements = [];
+    let supportedSentences = 0;
+
+    if (combinedSourceText.length === 0 || sentences.length === 0) {
+        return {
+            confidenceScore: 0,
+            recommendation: 'reject',
+            suspiciousStatements: [{ statement: responseText, reason: "No source text or response to validate." }],
+        };
+    }
+
+    sentences.forEach(sentence => {
+        const cleanSentence = sentence.toLowerCase().trim();
+        if (cleanSentence.length < 10) { // Ignore very short sentences
+            supportedSentences++;
+            return;
+        }
+        
+        // Simple check: does the sentence text appear in the sources?
+        // This is a very naive check. A better approach uses n-grams or semantic similarity.
+        if (combinedSourceText.includes(cleanSentence.substring(0, 50))) { // Check a snippet
+             supportedSentences++;
+        } else {
+            // A slightly more advanced check for keywords
+            const keywords = cleanSentence.split(' ').filter(w => w.length > 4); // get non-trivial words
+            if (keywords.length === 0) {
+                supportedSentences++;
+                return;
+            }
+            const supportedKeywords = keywords.filter(k => combinedSourceText.includes(k));
+            
+            if ((supportedKeywords.length / keywords.length) > 0.5) {
+                supportedSentences++;
+            } else {
+                suspiciousStatements.push({
+                    statement: sentence,
+                    reason: "Content not directly found in sources."
+                });
+            }
+        }
+    });
+
+    const confidenceScore = supportedSentences / sentences.length;
+    
+    return {
+        confidenceScore,
+        recommendation: confidenceScore > 0.6 ? 'approve' : 'reject',
+        suspiciousStatements,
+    };
+}
+
+
+/**
+ * Generates a quality report for a RAG response.
+ * @param {Object} reportData Data needed for the report.
+ * @returns {Object} The final quality report.
+ */
+export function generateQualityReport({ contextQuality, validation, hallucinationReport, responseLength, sourceCount }) {
+    let overallScore = 0;
+    const weaknesses = [];
+
+    // Base score on context quality
+    overallScore += (contextQuality.combinedConfidence || 0) * 0.4;
+    
+    // Adjust based on hallucination report
+    overallScore += (hallucinationReport.confidenceScore || 0) * 0.4;
+    if (hallucinationReport.recommendation === 'reject') {
+        weaknesses.push('High risk of hallucination.');
+    }
+
+    // Adjust based on source validation
+    if (validation.reliability === 'confirmed') {
+        overallScore += 0.2;
+    } else if (validation.reliability === 'conflicting') {
+        overallScore -= 0.3;
+        weaknesses.push('Sources are conflicting.');
+    }
+
+    // Penalize for very short or very long responses
+    if (responseLength < 20 || responseLength > 2000) {
+        overallScore -= 0.1;
+        weaknesses.push('Response length is unusual.');
+    }
+    
+    // Penalize for having no sources
+    if (sourceCount === 0) {
+        overallScore = 0;
+        weaknesses.push('No sources found to support response.');
+    }
+
+    overallScore = Math.max(0, Math.min(1, overallScore)); // Clamp score between 0 and 1
+
+    return {
+        overallScore,
+        recommendation: overallScore > 0.55 ? 'approve' : 'reject',
+        weaknesses,
+    };
+}
+
+
+/**
+ * Generates a human-readable disclaimer about the response confidence.
+ * @param {Object} contextQuality
+ * @param {Object} sourceValidation
+ * @returns {string} The disclaimer text.
+ */
+export function generateConfidenceDisclaimer(contextQuality, sourceValidation) {
+    let disclaimer = 'Based on the available information';
+
+    if (contextQuality.hasHighConfidenceRAG) {
+        disclaimer = 'Based on high-confidence internal documents';
+    } else if (contextQuality.hasSufficientContext) {
+        disclaimer = 'Based on a preliminary analysis of available documents';
+    } else {
+        return 'I could not find sufficient information to answer this question reliably.';
+    }
+
+    if (sourceValidation.reliability === 'confirmed' && contextQuality.hasMultipleSources) {
+        disclaimer += ', which have been cross-validated from multiple sources.';
+    } else if (sourceValidation.reliability === 'conflicting') {
+        disclaimer += '. **Warning:** Some sources presented conflicting information, which may affect the accuracy of this summary.';
+    } else if (contextQuality.ragResultCount > 0 && contextQuality.wikiResultCount === 0) {
+        disclaimer += ', primarily from the internal database.';
+    } else if (contextQuality.ragResultCount === 0 && contextQuality.wikiResultCount > 0) {
+        disclaimer += ', primarily from Wikipedia.';
+    }
+    
+    return `> *${disclaimer}*`;
+}
 
 # File: src/lib/utils.js
 import { clsx } from "clsx";
@@ -5625,18 +5901,43 @@ const ArticleSchema = new Schema(
 
 export default models.Article || model('Article', ArticleSchema);
 
+# File: src/models/PushSubscription.js
+// models/PushSubscription.js (version 1.0)
+import mongoose from 'mongoose';
+
+const { Schema, model, models } = mongoose;
+
+const PushSubscriptionSchema = new Schema(
+  {
+    endpoint: { type: String, required: true, unique: true },
+    keys: {
+      p256dh: { type: String, required: true },
+      auth: { type: String, required: true },
+    },
+  },
+  {
+    timestamps: true,
+    collection: 'push_subscriptions',
+  }
+);
+
+export default models.PushSubscription || model('PushSubscription', PushSubscriptionSchema);
+
 # File: src/models/SynthesizedEvent.js
-// src/models/SynthesizedEvent.js (version 1.1)
+// src/models/SynthesizedEvent.js (version 1.2 - Frontend Schema Sync)
 import mongoose from 'mongoose';
 
 const { Schema, models, model } = mongoose;
 
+// --- SCHEMA SYNC FIX ---
+// The `article_id` reference has been removed to match the updated backend model.
+// This ensures the frontend can correctly parse event data from the database.
 const SourceArticleSchema = new Schema({
-  article_id: { type: Schema.Types.ObjectId, ref: 'Article' },
   headline: { type: String, required: true },
   link: { type: String, required: true },
   newspaper: { type: String, required: true },
 }, { _id: false });
+// --- END SCHEMA SYNC FIX ---
 
 const KeyIndividualSchema = new Schema({
     name: String,

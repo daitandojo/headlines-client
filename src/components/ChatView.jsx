@@ -1,4 +1,4 @@
-// src/components/ChatView.jsx (version 1.7)
+// src/components/ChatView.jsx (version 1.8)
 "use client";
 
 import { useChat } from 'ai/react';
@@ -8,11 +8,14 @@ import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatScrollAnchor } from '@/components/chat/ChatScrollAnchor';
 import { ChatThinkingIndicator } from '@/components/chat/ChatThinkingIndicator';
-import { useAppContext } from '@/context/AppContext';
+import { useAppStore } from '@/store/use-app-store';
 import { generateChatTitle } from '@/actions/chat';
 
 export function ChatView({ chatId, updateChatTitle, getMessages, setMessages }) {
-    const { chatContextPrompt, setChatContextPrompt } = useAppContext();
+    const { chatContextPrompt, setChatContextPrompt } = useAppStore(state => ({
+        chatContextPrompt: state.chatContextPrompt,
+        setChatContextPrompt: state.setChatContextPrompt
+    }));
     
     const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, append } = useChat({
         id: chatId,
@@ -34,14 +37,12 @@ export function ChatView({ chatId, updateChatTitle, getMessages, setMessages }) 
     useEffect(() => {
         if (chatContextPrompt) {
             const userMessage = { role: 'user', content: chatContextPrompt };
-            setMessages(chatId, [...messages, userMessage]);
+            // Do not manually add to state; `append` will do this.
             append(userMessage);
-            setChatContextPrompt('');
+            setChatContextPrompt(''); // Reset the prompt in the store
         }
-    }, [chatContextPrompt, append, setChatContextPrompt, chatId, setMessages, messages]);
+    }, [chatContextPrompt, append, setChatContextPrompt]);
     
-    // Corrected Submit Handler: No longer manually adds the user message.
-    // The `useChat` hook handles this optimistically.
     const customHandleSubmit = (e) => {
         e.preventDefault();
         handleSubmit(e);

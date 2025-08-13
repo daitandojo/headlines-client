@@ -1,4 +1,4 @@
-// models/PushSubscription.js (version 1.0)
+// src/models/PushSubscription.js (version 1.1)
 import mongoose from 'mongoose';
 
 const { Schema, model, models } = mongoose;

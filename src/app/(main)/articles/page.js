@@ -1,4 +1,4 @@
-// src/app/(main)/articles/page.js (version 1.5)
+// src/app/(main)/articles/page.js (version 1.6)
 import { Suspense } from 'react';
 import { ArticlesView } from '@/components/ArticlesView';
 import { GlobalFilters } from '@/components/GlobalFilters';
@@ -40,10 +40,10 @@ async function getData(searchParams) {
 export default async function ArticlesPage({ searchParams }) {
     const { uniqueCountries, articleCount, eventCount, initialArticles } = await getData(searchParams);
     return (
-        <div className="container mx-auto p-4 md:p-8 flex flex-col min-h-screen">
+        <div className="container mx-auto flex flex-col min-h-screen">
             <Header articleCount={articleCount} eventCount={eventCount} />
             <MainNavTabs />
-            <main className="flex-grow flex flex-col mt-8">
+            <main className="flex-grow flex flex-col mt-4 sm:mt-8">
                 <GlobalFilters uniqueCountries={uniqueCountries} />
                 <Suspense fallback={<SkeletonLoader count={ARTICLES_PER_PAGE} />}>
                     <ArticlesView 
