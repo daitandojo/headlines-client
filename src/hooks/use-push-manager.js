@@ -1,4 +1,4 @@
-// src/hooks/use-push-manager.js (version 2.3)
+// src/hooks/use-push-manager.js (version 3.0)
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -26,49 +26,38 @@ export function usePushManager() {
             console.log("[PushManager] Browser supports Service Workers and Push.");
             setIsSupported(true);
 
-            // --- DEFINITIVE SERVICE WORKER INITIALIZATION ---
-            navigator.serviceWorker.register('/sw.js').then(registration => {
-                console.log("[PushManager] Service Worker registration successful:", registration);
+            // --- DEFINITIVE PATTERN: Wait for the Service Worker to be ready, with a timeout ---
+            const initializePushManager = async () => {
+                try {
+                    // The `navigator.serviceWorker.ready` promise resolves when the service worker
+                    // is active and controlling the page. This is the most reliable signal.
+                    const readyPromise = navigator.serviceWorker.ready;
+                    
+                    // Create a timeout promise to prevent getting stuck indefinitely.
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error("Service Worker readiness check timed out after 5 seconds.")), 5000)
+                    );
 
-                const checkWorkerState = (worker) => {
-                    if (worker.state === 'activated') {
-                        console.log('[PushManager] Service worker is active.');
-                        setSwRegistration(registration);
-                    } else {
-                        // If the worker is installed but not active, listen for its state change.
-                        worker.addEventListener('statechange', (e) => {
-                            if (e.target.state === 'activated') {
-                                console.log('[PushManager] Service worker has become active.');
-                                setSwRegistration(registration);
-                            }
-                        });
-                    }
-                };
+                    // Race the two promises. Whichever finishes first wins.
+                    const registration = await Promise.race([readyPromise, timeoutPromise]);
+                    
+                    console.log("[PushManager] Service Worker is active and ready:", registration);
+                    setSwRegistration(registration);
+                    
+                    const subscription = await registration.pushManager.getSubscription();
+                    console.log("[PushManager] Initial subscription state:", subscription);
+                    setIsSubscribed(!!subscription);
 
-                if (registration.active) {
-                    // If a worker is already active, we are good to go.
-                    checkWorkerState(registration.active);
-                } else if (registration.waiting) {
-                    // A worker is installed and waiting to become active.
-                    checkWorkerState(registration.waiting);
-                } else if (registration.installing) {
-                    // A new worker is installing.
-                    checkWorkerState(registration.installing);
+                } catch (error) {
+                    console.error("[PushManager] Initialization failed:", error);
+                    toast.error("Notification service failed.", { description: error.message });
+                    setIsSupported(false); // Gracefully disable the feature
+                } finally {
+                    setIsLoading(false);
                 }
-                
-                // Finally, check for an existing subscription.
-                return registration.pushManager.getSubscription();
-            }).then(subscription => {
-                console.log("[PushManager] Initial subscription state:", subscription);
-                setIsSubscribed(!!subscription);
-                setIsLoading(false);
-            }).catch(error => {
-                console.error("[PushManager] Service Worker initialization failed:", error);
-                toast.error("PWA features disabled.", { description: "Could not initialize the service worker." });
-                setIsSupported(false);
-                setIsLoading(false);
-            });
-            
+            };
+
+            initializePushManager();
         } else {
             console.log("[PushManager] Browser does not support Service Workers or Push.");
             setIsSupported(false);
@@ -78,7 +67,7 @@ export function usePushManager() {
 
     const subscribe = useCallback(async () => {
         if (!swRegistration) {
-            toast.error("Service Worker not ready.", { description: "The background service for notifications is still starting. Please try again in a moment." });
+            toast.error("Service Worker not ready *).", { description: "The background service for notifications is still starting. Please try again in a moment." });
             return false;
         }
 
