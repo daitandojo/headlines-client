@@ -1,15 +1,15 @@
-// src/components/ChatManager.jsx (version 1.3)
+// src/components/ChatManager.jsx (version 1.5)
 "use client";
 
 import { useEffect } from 'react';
 import { ChatSidebar } from './chat/ChatSidebar';
 import { ChatView } from './ChatView';
 import { useAppStore } from '@/store/use-app-store';
+import { useHasHydrated } from '@/hooks/use-has-hydrated';
 import { Loader2 } from 'lucide-react';
 
 export function ChatManager() {
-    // Select state and actions from the Zustand store.
-    const { 
+    const {
         chats, 
         activeChatId, 
         createChat, 
@@ -18,29 +18,23 @@ export function ChatManager() {
         getMessagesForChat,
         setMessagesForChat,
         init,
-    } = useAppStore(state => ({
-        chats: state.chats,
-        activeChatId: state.activeChatId,
-        createChat: state.createChat,
-        selectChat: state.selectChat,
-        updateChatTitle: state.updateChatTitle,
-        getMessagesForChat: state.getMessagesForChat,
-        setMessagesForChat: state.setMessagesForChat,
-        init: state.init
-    }));
+    } = useAppStore();
 
-    // The 'isHydrated' state ensures we don't render client-specific UI on the server.
-    const isHydrated = useAppStore(state => state._hasHydrated);
+    // Use the new hook to gate rendering until hydration is complete.
+    const hasHydrated = useHasHydrated();
 
     useEffect(() => {
-        // Initialize the store on mount to ensure a chat session is active.
-        if(isHydrated) {
+        // The init logic now safely runs only after hydration is confirmed.
+        if(hasHydrated) {
             init();
         }
-    }, [isHydrated, init]);
+    }, [hasHydrated, init]);
 
-    // During SSR or before hydration, show a loading state.
-    if (!isHydrated || !activeChatId) {
+    // The condition is now based on the reliable hydration status.
+    // This ensures server and initial client renders are identical (showing the loader).
+    // The component will re-render and show the chat UI only after the
+    // `useHasHydrated` hook returns true.
+    if (!hasHydrated || !activeChatId) {
         return (
             <div className="flex items-center justify-center h-full text-slate-500">
                 <Loader2 className="h-6 w-6 animate-spin mr-3" />
@@ -60,7 +54,7 @@ export function ChatManager() {
                 />
             </div>
             <ChatView
-                key={activeChatId} // This correctly resets component state when switching chats
+                key={activeChatId}
                 chatId={activeChatId}
                 updateChatTitle={updateChatTitle}
                 getMessages={getMessagesForChat}

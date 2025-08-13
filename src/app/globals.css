@@ -103,11 +103,6 @@
   .prose td {
     @apply px-3 py-2 align-top;
   }
-
-  /* Responsive body padding */
-  body {
-    @apply p-2 sm:p-4;
-  }
 }
 
 /* --- Premier Scrollbar Styling --- */

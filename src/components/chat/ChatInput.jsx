@@ -1,8 +1,9 @@
+// src/components/chat/ChatInput.jsx (version 2.0)
 import { Button } from '@/components/ui/button';
 import { Send, Loader2 } from 'lucide-react';
 import Textarea from 'react-textarea-autosize';
 
-export function ChatInput({ input, handleInputChange, handleSubmit, isLoading }) {
+export function ChatInput({ input, handleInputChange, handleSubmit, isLoading, inputRef }) {
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -13,6 +14,7 @@ export function ChatInput({ input, handleInputChange, handleSubmit, isLoading })
     return (
         <form onSubmit={handleSubmit} className="flex items-end gap-2 p-4 border-t border-white/10">
             <Textarea
+                ref={inputRef}
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}

@@ -1,8 +1,8 @@
-// src/components/ChatView.jsx (version 1.8)
+// src/components/ChatView.jsx (version 2.1)
 "use client";
 
 import { useChat } from 'ai/react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -12,6 +12,7 @@ import { useAppStore } from '@/store/use-app-store';
 import { generateChatTitle } from '@/actions/chat';
 
 export function ChatView({ chatId, updateChatTitle, getMessages, setMessages }) {
+    const inputRef = useRef(null);
     const { chatContextPrompt, setChatContextPrompt } = useAppStore(state => ({
         chatContextPrompt: state.chatContextPrompt,
         setChatContextPrompt: state.setChatContextPrompt
@@ -22,24 +23,36 @@ export function ChatView({ chatId, updateChatTitle, getMessages, setMessages }) 
         api: '/api/chat',
         initialMessages: getMessages(chatId),
         onFinish: async (message) => {
-            const currentMessages = [...messages, message];
-            setMessages(chatId, currentMessages);
+            // The `messages` array from the hook is the source of truth.
+            // At this point, it already contains the user's message and the complete assistant message.
+            setMessages(chatId, messages);
 
-            if (currentMessages.length === 2) {
-                const result = await generateChatTitle(currentMessages);
+            // --- BUG FIX ---
+            // The check is now performed on the `messages` array directly.
+            // A new chat's first exchange will result in messages.length being exactly 2.
+            if (messages.length === 2) {
+                const result = await generateChatTitle(messages);
                 if (result.success) {
                     updateChatTitle(chatId, result.title);
                 }
             }
+            // --- END BUG FIX ---
         },
     });
 
     useEffect(() => {
+        if (!isLoading && inputRef.current) {
+            setTimeout(() => {
+                inputRef.current.focus();
+            }, 100);
+        }
+    }, [isLoading]);
+
+    useEffect(() => {
         if (chatContextPrompt) {
             const userMessage = { role: 'user', content: chatContextPrompt };
-            // Do not manually add to state; `append` will do this.
             append(userMessage);
-            setChatContextPrompt(''); // Reset the prompt in the store
+            setChatContextPrompt('');
         }
     }, [chatContextPrompt, append, setChatContextPrompt]);
     
@@ -65,6 +78,7 @@ export function ChatView({ chatId, updateChatTitle, getMessages, setMessages }) 
                 </div>
                 <div className="px-4 pb-4">
                     <ChatInput 
+                        inputRef={inputRef}
                         input={input}
                         setInput={setInput}
                         handleInputChange={handleInputChange}

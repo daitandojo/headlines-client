@@ -1,4 +1,4 @@
-// next.config.js (version 1.3)
+// next.config.js (version 1.4)
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
@@ -7,6 +7,7 @@ const withPWA = require('next-pwa')({
   // It's best to disable it for development and test PWA features in a production build.
   // To test PWA: `npm run build && npm run start`
   disable: process.env.NODE_ENV === 'development',
+  customWorkerDir: 'worker', // Instructs next-pwa to merge our custom logic
 });
 
 /** @type {import('next').NextConfig} */
