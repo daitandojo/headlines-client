@@ -1,13 +1,14 @@
-// next.config.js (version 1.4)
+// next.config.js (version 1.5)
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
-  // The PWA plugin can be unreliable in dev mode with HMR.
-  // It's best to disable it for development and test PWA features in a production build.
-  // To test PWA: `npm run build && npm run start`
-  disable: process.env.NODE_ENV === 'development',
-  customWorkerDir: 'worker', // Instructs next-pwa to merge our custom logic
+  // The `disable` flag has been removed to enable PWA features in development.
+  // The `customWorkerDir` is replaced by the more modern `extend` option below.
+  extend: {
+    // This injects our custom service worker logic into the generated file.
+    importScripts: ['sw-custom.js'],
+  },
 });
 
 /** @type {import('next').NextConfig} */

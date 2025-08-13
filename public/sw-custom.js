@@ -1,4 +1,4 @@
-// worker/index.js (version 1.0)
+// public/sw-custom.js (version 1.0)
 "use client";
 
 self.addEventListener('push', (event) => {
