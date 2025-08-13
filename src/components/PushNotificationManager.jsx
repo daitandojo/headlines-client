@@ -1,4 +1,4 @@
-// src/components/PushNotificationManager.jsx (version 1.2)
+// src/components/PushNotificationManager.jsx (version 1.3)
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -33,7 +33,7 @@ export function PushNotificationManager() {
                     if (subscription) {
                         setIsSubscribed(true);
                     }
-                    setIsLoading(false); // Correctly set loading to false in all cases
+                    setIsLoading(false);
                 });
             }).catch(err => {
                 console.error("Service worker not ready:", err);
@@ -47,11 +47,22 @@ export function PushNotificationManager() {
 
     const handleSubscribe = async () => {
         if (!VAPID_PUBLIC_KEY) {
-            toast.error("Push notifications are not configured on the server.");
+            toast.error("Push notifications are not configured on the server.", {
+                description: "The VAPID public key is missing from the environment variables.",
+            });
             return;
         }
 
+        if (Notification.permission === 'denied') {
+            toast.error("Notification permission has been denied.", {
+                description: "You must enable notifications for this site in your browser settings.",
+            });
+            return;
+        }
+        
         setIsLoading(true);
+        toast.info("Awaiting notification permission...");
+        
         try {
             const registration = await navigator.serviceWorker.ready;
             const sub = await registration.pushManager.subscribe({
@@ -59,17 +70,25 @@ export function PushNotificationManager() {
                 applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
             });
             
-            await fetch('/api/push/subscribe', {
+            const response = await fetch('/api/push/subscribe', {
                 method: 'POST',
                 body: JSON.stringify(sub),
                 headers: { 'Content-Type': 'application/json' },
             });
 
+            if (!response.ok) {
+                throw new Error("Failed to save subscription on the server.");
+            }
+
             setIsSubscribed(true);
-            toast.success("Notifications enabled!");
+            toast.success("Notifications enabled!", {
+                description: "You will now receive alerts for new intelligence events.",
+            });
         } catch (error) {
             console.error("Error subscribing:", error);
-            toast.error("Failed to enable notifications. Please ensure you've granted permission in your browser settings.");
+            toast.error("Failed to enable notifications.", {
+                description: "Please ensure you've granted permission. If the problem persists, check the console.",
+            });
         } finally {
             setIsLoading(false);
         }
