@@ -1,5 +1,5 @@
-// worker/index.js (version 1.1)
-"use client";
+// worker/index.js (version 1.2)
+// The invalid `"use client";` directive has been removed.
 
 self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push Received.');
