@@ -21,7 +21,7 @@ export const Header = ({ articleCount, eventCount }) => {
       </div>
       
       <p className="text-center text-sm sm:text-base text-slate-400 max-w-3xl mx-auto">
-        Search and analyze 
+        Search & analyze 
         <span className="font-bold text-slate-300"> {eventCount?.toLocaleString()} </span> 
         events from 
         <span className="font-bold text-slate-300"> {articleCount?.toLocaleString()} </span> 
