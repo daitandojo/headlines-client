@@ -1,4 +1,4 @@
-// src/hooks/use-push-manager.js (version 6.0)
+// src/hooks/use-push-manager.js (version 11.0)
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -19,7 +19,19 @@ export function usePushManager() {
   const [isSupported, setIsSupported] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [swRegistration, setSwRegistration] = useState(null)
+
+  const checkSubscription = useCallback(async () => {
+    try {
+      const registration = await navigator.serviceWorker.ready
+      const subscription = await registration.pushManager.getSubscription()
+      setIsSubscribed(!!subscription)
+      return !!subscription
+    } catch (error) {
+      console.error('[PushManager] Error checking subscription:', error)
+      setIsSubscribed(false)
+      return false
+    }
+  }, [])
 
   useEffect(() => {
     if (
@@ -27,120 +39,95 @@ export function usePushManager() {
       'serviceWorker' in navigator &&
       'PushManager' in window
     ) {
-      console.log('[PushManager] Browser supports Service Workers and Push.')
       setIsSupported(true)
 
-      const initializePushManager = async () => {
-        setIsLoading(true)
-        console.log(
-          '[PushManager] Initializing. Waiting for service worker to become active...'
-        )
-
+      const setup = async () => {
         try {
-          const readyPromise = navigator.serviceWorker.ready
+          console.log('[PushManager] Registering service worker...')
+          await navigator.serviceWorker.register('/sw.js')
 
-          // A generous timeout of 20 seconds, specifically for the slower first-time
-          // activation on mobile devices, especially iOS.
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(
-              () =>
-                reject(
-                  new Error('Service worker activation timed out after 20 seconds.')
-                ),
-              20000
-            )
+          const handleControllerChange = async () => {
+            console.log('[PushManager] Controller changed, checking subscription state.')
+            await checkSubscription()
+            setIsLoading(false)
+          }
+
+          navigator.serviceWorker.addEventListener(
+            'controllerchange',
+            handleControllerChange
           )
 
-          const registration = await Promise.race([readyPromise, timeoutPromise])
+          if (navigator.serviceWorker.controller) {
+            console.log('[PushManager] Controller already active, checking subscription.')
+            await checkSubscription()
+            setIsLoading(false)
+          } else {
+            console.log(
+              '[PushManager] No active controller, waiting for it to take over...'
+            )
+          }
 
-          console.log('[PushManager] Service Worker is active and ready:', registration)
-          setSwRegistration(registration)
-
-          const subscription = await registration.pushManager.getSubscription()
-          console.log('[PushManager] Initial subscription state:', subscription)
-          setIsSubscribed(!!subscription)
+          return () => {
+            navigator.serviceWorker.removeEventListener(
+              'controllerchange',
+              handleControllerChange
+            )
+          }
         } catch (error) {
-          console.error('[PushManager] Initialization failed:', error)
-          toast.error('Notification service failed to start.', {
-            description:
-              'This can happen on first launch. Please try refreshing the app. If the issue persists, reinstalling the app may help.',
-          })
-          setIsSupported(false)
-        } finally {
+          console.error('[PushManager] SW Registration failed:', error)
+          toast.error('Could not initialize background features.')
           setIsLoading(false)
-          console.log('[PushManager] Initialization finished.')
         }
       }
-
-      initializePushManager()
+      setup()
     } else {
-      console.log('[PushManager] Browser does not support Service Workers or Push.')
-      setIsSupported(false)
       setIsLoading(false)
     }
-  }, [])
+  }, [checkSubscription])
 
   const subscribe = useCallback(async () => {
-    if (!swRegistration) {
-      toast.error('Notification service not ready.', {
-        description:
-          'The background service is still starting. Please try again in a moment.',
-      })
-      return false
-    }
-
-    const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-    if (!VAPID_PUBLIC_KEY) {
-      toast.error('Push notifications are not configured on the server.')
-      return false
-    }
-
-    if (Notification.permission === 'denied') {
-      toast.error('Notification permission has been denied.', {
-        description:
-          'You must enable notifications for this site in your browser settings.',
-      })
-      return false
+    if (isSubscribed) {
+      toast.info('You are already subscribed to notifications.')
+      return
     }
 
     setIsLoading(true)
     try {
-      const subscription = await swRegistration.pushManager.subscribe({
+      const registration = await navigator.serviceWorker.ready
+
+      if (Notification.permission === 'denied') {
+        throw new Error('Notification permission has been denied by the user.')
+      }
+
+      const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!VAPID_PUBLIC_KEY) {
+        throw new Error('VAPID public key not configured.')
+      }
+
+      const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       })
-      console.log('[PushManager] New subscription created:', subscription)
 
       await fetch('/api/push/subscribe', {
         method: 'POST',
         body: JSON.stringify(subscription),
         headers: { 'Content-Type': 'application/json' },
       })
-      console.log('[PushManager] Subscription sent to server.')
 
       setIsSubscribed(true)
       toast.success('Notifications enabled!')
-      return true
     } catch (error) {
-      console.error('[PushManager] Full subscription error object:', error)
-
-      let errorMessage = 'An unexpected error occurred.'
-      if (error instanceof Error) {
-        errorMessage = `${error.name}: ${error.message}`
-      }
-
+      console.error('[PushManager] Subscription failed:', error)
       if (error.name === 'NotAllowedError') {
-        toast.error('Permission denied.', {
-          description: 'You did not grant permission for notifications.',
-        })
+        toast.error('Permission for notifications was denied.')
       } else {
-        toast.error('Failed to enable notifications.', { description: errorMessage })
+        toast.error('Failed to enable notifications.', { description: error.message })
       }
-      return false
     } finally {
       setIsLoading(false)
     }
-  }, [swRegistration])
+  }, [isSubscribed])
 
   return { isSupported, isSubscribed, isLoading, subscribe }
 }

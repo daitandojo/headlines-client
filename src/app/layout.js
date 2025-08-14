@@ -1,9 +1,8 @@
-// src/app/layout.js (version 3.0)
+// src/app/layout.js (version 4.0)
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { cn } from '@/lib/utils'
 import { Toaster } from '@/components/ui/sonner'
-import Script from 'next/script'
 
 const fontSans = Inter({
   subsets: ['latin'],
@@ -36,18 +35,7 @@ export default function RootLayout({ children }) {
       <body className={cn('min-h-screen font-sans antialiased', fontSans.variable)}>
         {children}
         <Toaster />
-        <Script id="sw-registrar" strategy="lazyOnload">
-          {`
-            if ('serviceWorker' in navigator) {
-              window.addEventListener('load', () => {
-                navigator.serviceWorker
-                  .register('/sw.js')
-                  .then((registration) => console.log('[SW Registrar] Service Worker registered:', registration.scope))
-                  .catch((error) => console.error('[SW Registrar] Registration failed:', error));
-              });
-            }
-          `}
-        </Script>
+        {/* The service worker is now registered programmatically inside the usePushManager hook */}
       </body>
     </html>
   )
