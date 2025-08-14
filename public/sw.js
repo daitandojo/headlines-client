@@ -1,20 +1,26 @@
-// public/sw.js (version 3.0)
-// This is our new, simplified, hand-written service worker.
+// public/sw.js (version 4.0)
+// This service worker is designed for reliability and immediate activation.
 
-// On install, activate immediately
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Install event fired. Activating immediately.')
+  console.log('[Service Worker] Install event fired. New worker installing.')
+  // Force the waiting service worker to become the active service worker.
   event.waitUntil(self.skipWaiting())
+  console.log('[Service Worker] skipWaiting() called.')
 })
 
-// On activate, take control of all clients
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activate event fired. Claiming clients.')
+  console.log('[Service Worker] Activate event fired. New worker activating.')
+  // Take control of all pages under this scope immediately.
   event.waitUntil(self.clients.claim())
+  console.log('[Service Worker] clients.claim() called.')
 })
 
 self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push Received.')
+  if (!event.data) {
+    console.error('[Service Worker] Push event but no data')
+    return
+  }
   console.log(`[Service Worker] Push had this data: "${event.data.text()}"`)
 
   let data
@@ -33,10 +39,10 @@ self.addEventListener('push', (event) => {
   const options = {
     body: data.body || 'New content has been added.',
     icon: data.icon || '/icons/icon-192x192.png',
-    badge: '/icons/icon-96x96.png',
+    badge: '/icons/icon-96x96.png', // A smaller badge icon for some platforms
     vibrate: [100, 50, 100],
     data: {
-      url: data.url || '/',
+      url: data.url || '/', // Ensure URL is always present in data
     },
     actions: [
       { action: 'view_event', title: 'View Event' },
@@ -52,16 +58,26 @@ self.addEventListener('push', (event) => {
 })
 
 self.addEventListener('notificationclick', (event) => {
-  console.log('[Service Worker] Notification click Received.', event.action)
+  console.log(
+    '[Service Worker] Notification click Received.',
+    event.action,
+    event.notification
+  )
+
+  // Ensure we have a URL to open.
   const urlToOpen = new URL(event.notification.data.url, self.location.origin).href
 
+  // Close the notification.
   event.notification.close()
 
+  // If the action is 'dismiss', we do nothing further.
   if (event.action === 'dismiss') {
     console.log('[Service Worker] Dismiss action handled.')
     return
   }
 
+  // For the 'view_event' action or a click on the notification body,
+  // focus an existing window or open a new one.
   event.waitUntil(
     self.clients
       .matchAll({
@@ -69,16 +85,18 @@ self.addEventListener('notificationclick', (event) => {
         includeUncontrolled: true,
       })
       .then((clientList) => {
-        if (clientList.length > 0) {
-          let client = clientList[0]
-          for (let i = 0; i < clientList.length; i++) {
-            if (clientList[i].focused) {
-              client = clientList[i]
-            }
+        // Check if there's a client to focus.
+        for (const client of clientList) {
+          if (client.url === urlToOpen && 'focus' in client) {
+            console.log('[Service Worker] Found matching client to focus.')
+            return client.focus()
           }
-          return client.focus().then((c) => c.navigate(urlToOpen))
         }
-        return self.clients.openWindow(urlToOpen)
+        // If no matching client is found, or we can't focus, open a new window.
+        if (self.clients.openWindow) {
+          console.log('[Service Worker] No matching client found, opening new window.')
+          return self.clients.openWindow(urlToOpen)
+        }
       })
   )
 })
