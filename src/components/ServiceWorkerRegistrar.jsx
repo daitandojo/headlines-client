@@ -1,4 +1,4 @@
-// src/components/ServiceWorkerRegistrar.jsx (version 2.0)
+// src/components/ServiceWorkerRegistrar.jsx (version 3.0)
 'use client'
 
 import { useEffect } from 'react'
@@ -6,34 +6,25 @@ import { toast } from 'sonner'
 
 /**
  * A client-side component dedicated to registering the service worker.
- * It renders nothing and runs its logic in a useEffect hook.
+ * It now also ensures the service worker takes control immediately.
  */
 export function ServiceWorkerRegistrar() {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       const registerServiceWorker = async () => {
         try {
-          console.log('[SW] Attempting to register service worker...')
-
+          console.log('[SW Registrar] Attempting to register service worker...')
           const registration = await navigator.serviceWorker.register('/sw.js', {
             scope: '/',
           })
+          console.log('[SW Registrar] Registration successful:', registration)
 
-          console.log(
-            '[SW] Service Worker registered successfully with scope:',
-            registration.scope
-          )
-
-          // Listen for updates to the service worker.
           registration.addEventListener('updatefound', () => {
-            console.log('[SW] A new service worker version has been found.')
+            console.log('[SW Registrar] New service worker version found.')
             const newWorker = registration.installing
-
             newWorker?.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log(
-                  '[SW] New service worker is installed and ready. Notifying user.'
-                )
+                console.log('[SW Registrar] New worker installed. Notifying user.')
                 toast.info('A new version of the app is available!', {
                   action: {
                     label: 'Refresh',
@@ -44,18 +35,23 @@ export function ServiceWorkerRegistrar() {
               }
             })
           })
+
+          // Ensure the current service worker is active and controlling the page
+          if (navigator.serviceWorker.controller) {
+            console.log('[SW Registrar] Service worker is already controlling the page.')
+          } else {
+            console.log(
+              '[SW Registrar] No controller, page may have been loaded before SW activation.'
+            )
+          }
         } catch (error) {
-          console.error('[SW] Service Worker registration failed:', error)
-          toast.error('Could not initialize background features.', {
-            description: 'Please try refreshing the page.',
-          })
+          console.error('[SW Registrar] Registration failed:', error)
+          toast.error('Could not initialize background features.')
         }
       }
-
-      // Register after the page has loaded to avoid blocking initial render.
       window.addEventListener('load', registerServiceWorker)
     }
   }, [])
 
-  return null // This component does not render any UI.
+  return null
 }
