@@ -1,4 +1,4 @@
-// src/hooks/use-push-manager.js (version 9.0)
+// src/hooks/use-push-manager.js (version 10.0)
 'use client'
 
 import { useState, useCallback } from 'react'
@@ -18,9 +18,10 @@ function urlBase64ToUint8Array(base64String) {
 export function usePushManager() {
   const [isSupported, setIsSupported] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false) // Start as false
   const [permission, setPermission] = useState('default')
 
+  // This function is now purely synchronous to avoid any hanging promises on load.
   const initialize = useCallback(() => {
     if (
       typeof window !== 'undefined' &&
@@ -29,25 +30,15 @@ export function usePushManager() {
     ) {
       setIsSupported(true)
       setPermission(Notification.permission)
-      // Just check for an existing subscription without blocking.
-      navigator.serviceWorker.ready
-        .then((reg) => {
-          reg.pushManager.getSubscription().then((sub) => {
-            if (sub) {
-              setIsSubscribed(true)
-            }
-          })
-        })
-        .finally(() => {
-          setIsLoading(false)
-        })
-    } else {
-      setIsLoading(false)
+      // We don't check for subscription here to avoid async calls.
+      // We assume not subscribed until the user clicks or we verify it.
     }
   }, [])
 
   const handleSubscription = useCallback(async () => {
-    // This function now contains the entire flow, initiated by user click.
+    // --- DEFINITIVE FIX FOR iOS ---
+    // The entire async flow is contained within this single user-initiated function.
+
     if (!isSupported) {
       toast.error('Push notifications are not supported on this browser.')
       return
@@ -56,30 +47,33 @@ export function usePushManager() {
     setIsLoading(true)
 
     try {
-      console.log('[PushManager] Awaiting service worker readiness...')
+      console.log(
+        '[PushManager] User action triggered. Awaiting service worker readiness...'
+      )
       const registration = await navigator.serviceWorker.ready
       console.log('[PushManager] Service worker is ready.')
 
       const existingSubscription = await registration.pushManager.getSubscription()
+
       if (existingSubscription) {
+        console.log('[PushManager] User is already subscribed.')
         toast.info('You are already subscribed to notifications.')
         setIsSubscribed(true)
-        setIsLoading(false)
-        return
+        return // Exit successfully
       }
 
       if (Notification.permission === 'denied') {
+        console.warn('[PushManager] Notification permission is denied.')
         toast.error('Notifications blocked.', {
-          description: 'Please enable notifications in your browser settings.',
+          description: 'Please enable notifications in your browser/OS settings.',
         })
-        setIsLoading(false)
-        return
+        return // Exit
       }
 
-      console.log('[PushManager] Requesting subscription...')
+      console.log('[PushManager] Requesting new subscription...')
       const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
       if (!VAPID_PUBLIC_KEY) {
-        throw new Error('VAPID public key not found.')
+        throw new Error('VAPID public key not configured.')
       }
 
       const subscription = await registration.pushManager.subscribe({
@@ -109,7 +103,7 @@ export function usePushManager() {
         toast.error('Failed to enable notifications.', { description: error.message })
       }
     } finally {
-      // This is the key to fixing the perpetual spinner.
+      // This guarantees the spinner will always be hidden after the flow completes.
       setIsLoading(false)
       console.log('[PushManager] Subscription flow finished.')
     }

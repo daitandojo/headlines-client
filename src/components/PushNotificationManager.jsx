@@ -1,4 +1,4 @@
-// src/components/PushNotificationManager.jsx (version 4.0)
+// src/components/PushNotificationManager.jsx (version 5.0)
 'use client'
 
 import { Button } from './ui/button'
@@ -13,17 +13,16 @@ import { usePushManager } from '@/hooks/use-push-manager'
 import { useEffect } from 'react'
 
 export function PushNotificationManager() {
-  // The hook is now simpler and more focused.
   const {
     isSupported,
     isSubscribed,
     isLoading,
     permission,
     handleSubscription,
-    initialize, // A new function to check initial state
+    initialize, // Checks initial, synchronous state
   } = usePushManager()
 
-  // On component mount, perform a non-blocking check for the initial state.
+  // On component mount, perform a quick, synchronous check for initial state.
   useEffect(() => {
     initialize()
     // eslint-disable-next-line react-hooks/exhaustive-deps
