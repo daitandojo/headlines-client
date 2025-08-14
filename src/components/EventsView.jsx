@@ -1,3 +1,4 @@
+// src/components/EventsView.jsx (version 1.2)
 'use client'
 
 import { useMemo } from 'react'
@@ -9,43 +10,56 @@ import { getEvents, deleteEvent } from '@/actions/events'
 import { useRealtimeUpdates } from '@/hooks/use-realtime-updates'
 import { LoadingOverlay } from './LoadingOverlay'
 
-export function EventsView({ searchParams }) {
+export function EventsView({ initialEvents, searchParams }) {
   const queryClient = useQueryClient()
   const queryKey = useMemo(() => ['events', searchParams], [searchParams])
 
-  // useInfiniteQuery handles fetching, pagination, and caching
-  const { data, fetchNextPage, hasNextPage, isLoading, isFetching, isError } =
-    useInfiniteQuery({
-      queryKey: queryKey,
-      queryFn: ({ pageParam = 1 }) =>
-        getEvents({
-          page: pageParam,
-          filters: { q: searchParams.q, country: searchParams.country },
-          sort: searchParams.sort,
-        }),
-      getNextPageParam: (lastPage, allPages) => {
-        return lastPage.length > 0 ? allPages.length + 1 : undefined
-      },
-      initialPageParam: 1,
-    })
+  const { data, fetchNextPage, hasNextPage, isFetching, isError } = useInfiniteQuery({
+    queryKey: queryKey,
+    queryFn: ({ pageParam = 1 }) =>
+      getEvents({
+        page: pageParam,
+        filters: { q: searchParams.q, country: searchParams.country },
+        sort: searchParams.sort,
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.length > 0 ? (data?.pages.length ?? 0) + 1 : undefined,
+    initialPageParam: 1,
+    initialData: {
+      pages: [initialEvents],
+      pageParams: [1],
+    },
+    staleTime: 60 * 1000,
+  })
 
-  // useMutation handles the delete action
   const { mutate: performDelete } = useMutation({
     mutationFn: deleteEvent,
-    onSuccess: (result, eventId) => {
-      if (result.success) {
-        toast.success(result.message)
-        queryClient.invalidateQueries({ queryKey })
-      } else {
-        toast.error(result.message)
-      }
+    onMutate: async (eventIdToDelete) => {
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData(queryKey)
+      queryClient.setQueryData(queryKey, (oldData) => {
+        if (!oldData) return { pages: [], pageParams: [] }
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page) =>
+            page.filter((event) => event._id !== eventIdToDelete)
+          ),
+        }
+      })
+      toast.success('Event removed.')
+      return { previousData }
     },
-    onError: (error) => {
-      toast.error(`Failed to delete event: ${error.message}`)
+    onError: (err, eventId, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData)
+      }
+      toast.error('Failed to delete event. Restoring.')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 
-  // Activate real-time updates
   useRealtimeUpdates({
     channel: 'events-channel',
     event: 'new-event',

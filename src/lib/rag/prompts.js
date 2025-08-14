@@ -1,4 +1,4 @@
-// src/lib/rag/prompts.js (version 5.0)
+// src/lib/rag/prompts.js (version 5.1)
 
 export const PLANNER_PROMPT = `You are an expert AI Planner. Your job is to analyze the user's query and conversation history to create a step-by-step plan for an AI Synthesizer Agent to follow. You also create a list of optimized search queries for a Retrieval Agent.
 
@@ -101,7 +101,3 @@ Analyze the "Proposed Response" sentence by sentence.
 If the response is fully supported, "unsupported_claims" should be an empty array. If the "Proposed Response" states that it cannot answer the question, consider it grounded.`
 
 export const FAILED_GROUNDEDNESS_PROMPT = `I could not form a reliable answer based on the available information. The initial response I generated may have contained information not supported by the sources. For accuracy, please ask a more specific question or try rephrasing your request.`
-
-// DEPRECATED PROMPTS (kept for reference, but not used in the new flow)
-export const QUERY_REWRITER_PROMPT = ``
-export const ENTITY_EXTRACTOR_PROMPT = ``

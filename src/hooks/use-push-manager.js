@@ -1,4 +1,4 @@
-// src/hooks/use-push-manager.js (version 11.0)
+// src/hooks/use-push-manager.js (version 12.0)
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -22,6 +22,7 @@ export function usePushManager() {
 
   const checkSubscription = useCallback(async () => {
     try {
+      // This now assumes the SW is registered by the layout and will be ready.
       const registration = await navigator.serviceWorker.ready
       const subscription = await registration.pushManager.getSubscription()
       setIsSubscribed(!!subscription)
@@ -41,45 +42,16 @@ export function usePushManager() {
     ) {
       setIsSupported(true)
 
-      const setup = async () => {
-        try {
-          console.log('[PushManager] Registering service worker...')
-          await navigator.serviceWorker.register('/sw.js')
-
-          const handleControllerChange = async () => {
-            console.log('[PushManager] Controller changed, checking subscription state.')
-            await checkSubscription()
-            setIsLoading(false)
-          }
-
-          navigator.serviceWorker.addEventListener(
-            'controllerchange',
-            handleControllerChange
-          )
-
-          if (navigator.serviceWorker.controller) {
-            console.log('[PushManager] Controller already active, checking subscription.')
-            await checkSubscription()
-            setIsLoading(false)
-          } else {
-            console.log(
-              '[PushManager] No active controller, waiting for it to take over...'
-            )
-          }
-
-          return () => {
-            navigator.serviceWorker.removeEventListener(
-              'controllerchange',
-              handleControllerChange
-            )
-          }
-        } catch (error) {
-          console.error('[PushManager] SW Registration failed:', error)
-          toast.error('Could not initialize background features.')
+      // The SW is registered in layout.js. We just wait for it to be ready.
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          console.log('[PushManager] Service Worker is ready, checking subscription.')
+          checkSubscription().finally(() => setIsLoading(false))
+        })
+        .catch((error) => {
+          console.error('[PushManager] Service worker failed to become ready:', error)
           setIsLoading(false)
-        }
-      }
-      setup()
+        })
     } else {
       setIsLoading(false)
     }

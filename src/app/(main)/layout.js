@@ -1,38 +1,44 @@
-// src/app/(main)/layout.js (version 4.0)
-'use client' // Required for usePathname hook
-
-import { usePathname } from 'next/navigation'
+// src/app/(main)/layout.js (version 8.1)
+import { getTotalArticleCount } from '@/actions/articles'
+import { getTotalEventCount } from '@/actions/events'
+import { getTotalOpportunitiesCount } from '@/actions/opportunities'
+import { Providers } from '../providers'
 import { Header } from '@/components/Header'
 import { MainNavTabs } from '@/components/MainNavTabs'
-import { Providers } from '../providers'
-import { cn } from '@/lib/utils'
-// NOTE: This layout no longer needs to fetch data, as child pages/layouts handle it.
+import { ConditionalLayout } from '@/components/ConditionalLayout'
 
 /**
- * This shared layout provides a consistent structure for most main app views.
- * It now conditionally applies padding to accommodate the full-screen chat page.
+ * This is now a pure, stable Server Component layout.
+ * It fetches data and renders the primary structure.
  */
-export default function MainLayout({ children }) {
-  const pathname = usePathname()
-  const isChatPage = pathname === '/chat'
+export default async function MainLayout({ children }) {
+  // Fetch all data required for the Header.
+  const [articleCount, eventCount, opportunityCount] = await Promise.all([
+    getTotalArticleCount(),
+    getTotalEventCount(),
+    getTotalOpportunitiesCount(),
+  ])
 
   return (
     <Providers>
       {/*
-        If it's the chat page, we render the children directly without wrapping them
-        in the standard padded layout, allowing ChatPage to control its own full-height layout.
+        The ConditionalLayout is a client component that decides whether to
+        render the full shell or just the children (for the chat page).
       */}
-      {isChatPage ? (
-        children
-      ) : (
-        <div className="container mx-auto p-4 md:p-8 flex flex-col min-h-screen">
-          <Header />
+      <ConditionalLayout>
+        {/* The Header scrolls away with the content. */}
+        <Header
+          articleCount={articleCount}
+          eventCount={eventCount}
+          opportunityCount={opportunityCount}
+        />
+        {/* The MainNavTabs are in a sticky container to keep them visible. */}
+        <div className="sticky top-[5px] z-30 my-4">
           <MainNavTabs />
-          <main className={cn('flex-grow flex flex-col', !isChatPage && 'mt-8')}>
-            {children}
-          </main>
         </div>
-      )}
+        {/* The main content area that scrolls underneath the tabs. */}
+        <main className="flex-grow flex flex-col">{children}</main>
+      </ConditionalLayout>
     </Providers>
   )
 }

@@ -1,10 +1,9 @@
-// src/lib/rag/retrieval.js (version 4.0)
+// src/lib/rag/retrieval.js (version 5.0)
 import OpenAI from 'openai'
 import { Pinecone } from '@pinecone-database/pinecone'
 import { generateQueryEmbeddings } from '@/lib/embeddings'
 import { fetchBatchWikipediaSummaries, validateWikipediaContent } from '@/lib/wikipedia'
 import { getGoogleSearchResults } from '@/lib/serpapi'
-import { QUERY_REWRITER_PROMPT, ENTITY_EXTRACTOR_PROMPT } from './prompts'
 import { env } from '@/lib/env.mjs'
 
 let groq, pineconeIndex
@@ -19,50 +18,14 @@ function initializeClients() {
   }
 }
 
-const QUERY_REWRITER_MODEL = 'llama3-8b-8192'
 const ENTITY_EXTRACTOR_MODEL = 'llama3-70b-8192'
 const SIMILARITY_THRESHOLD = 0.38
+const ENTITY_EXTRACTOR_PROMPT_FOR_HISTORY = `You are an entity extractor. Your job is to identify all specific people and companies mentioned in a given text.
+Respond ONLY with a valid JSON object with the following structure:
+{ "entities": ["Entity Name 1", "Entity Name 2"] }
+`
 
-async function rewriteQuery(messages) {
-  initializeClients()
-  let queryForRetrieval = messages[messages.length - 1].content
-  if (messages.length > 1) {
-    const conversationHistory = messages
-      .slice(-5, -1)
-      .map((m) => `${m.role}: ${m.content}`)
-      .join('\n')
-    const rewriteResponse = await groq.chat.completions.create({
-      model: QUERY_REWRITER_MODEL,
-      messages: [
-        { role: 'system', content: QUERY_REWRITER_PROMPT },
-        {
-          role: 'user',
-          content: `History:\n${conversationHistory}\n\nLatest question: "${queryForRetrieval}"`,
-        },
-      ],
-      temperature: 0.0,
-    })
-    queryForRetrieval = rewriteResponse.choices[0].message.content.trim()
-    console.log(`[RAG Retrieval] Rewritten Query: "${queryForRetrieval}"`)
-  }
-  return queryForRetrieval
-}
-
-async function extractEntities(query) {
-  initializeClients()
-  const entityResponse = await groq.chat.completions.create({
-    model: ENTITY_EXTRACTOR_MODEL,
-    messages: [
-      { role: 'system', content: ENTITY_EXTRACTOR_PROMPT },
-      { role: 'user', content: `User's Question: "${query}"` },
-    ],
-    response_format: { type: 'json_object' },
-  })
-  const { entities } = JSON.parse(entityResponse.choices[0].message.content)
-  console.log(`[RAG Retrieval] Extracted Entities: ${entities.join(', ')}`)
-  return entities
-}
-
+// This function is still useful for excluding entities mentioned in recent history.
 async function extractEntitiesFromHistory(messages) {
   if (messages.length < 2) {
     return []
@@ -77,7 +40,7 @@ async function extractEntitiesFromHistory(messages) {
     const entityResponse = await groq.chat.completions.create({
       model: ENTITY_EXTRACTOR_MODEL,
       messages: [
-        { role: 'system', content: ENTITY_EXTRACTOR_PROMPT },
+        { role: 'system', content: ENTITY_EXTRACTOR_PROMPT_FOR_HISTORY },
         {
           role: 'user',
           content: `Extract all key people and companies from this text:\n"${historyText}"`,
@@ -90,9 +53,11 @@ async function extractEntitiesFromHistory(messages) {
     const cleanEntities = entities.map((e) =>
       e.replace(/\s*\((person|company)\)$/, '').trim()
     )
-    console.log(
-      `[RAG Retrieval] Entities from history for exclusion: ${cleanEntities.join(', ')}`
-    )
+    if (cleanEntities.length > 0) {
+      console.log(
+        `[RAG Retrieval] Entities from history for exclusion: ${cleanEntities.join(', ')}`
+      )
+    }
     return cleanEntities
   } catch (error) {
     console.error('Could not extract entities from history:', error)
@@ -100,12 +65,13 @@ async function extractEntitiesFromHistory(messages) {
   }
 }
 
-async function fetchPineconeContext(query, entities, exclude_entities = []) {
+// Refactored to accept an array of queries directly from the planner.
+async function fetchPineconeContext(queries, exclude_entities = []) {
   initializeClients()
-  const fullQueryEmbeddings = await generateQueryEmbeddings(query)
-  const entityEmbeddings =
-    entities.length > 0 ? await generateQueryEmbeddings(entities[0]) : []
-  const allQueryEmbeddings = [...fullQueryEmbeddings, ...entityEmbeddings]
+  const queryEmbeddings = await Promise.all(
+    queries.map((q) => generateQueryEmbeddings(q))
+  )
+  const allQueryEmbeddings = queryEmbeddings.flat()
 
   const filter =
     exclude_entities.length > 0
@@ -147,7 +113,6 @@ async function fetchPineconeContext(query, entities, exclude_entities = []) {
   results.forEach((match) => {
     console.log(`- Score: ${match.score.toFixed(4)} | ID: ${match.id}`)
     console.log(`  Headline: ${match.metadata.headline}`)
-    console.log(`  Summary: ${match.metadata.summary}`)
   })
   console.groupEnd()
 
@@ -174,15 +139,20 @@ async function fetchValidatedWikipediaContext(entities) {
   return validWikiResults
 }
 
-export async function retrieveContextForQuery(messages) {
-  const rewrittenQuery = await rewriteQuery(messages)
-  const entitiesToSearch = await extractEntities(rewrittenQuery)
+/**
+ * Retrieves context from all sources based on the planner's output.
+ * @param {object} plan - The plan object from the planner agent.
+ * @param {Array<object>} messages - The full chat history.
+ * @returns {Promise<object>} An object containing results from all retrieval sources.
+ */
+export async function retrieveContextForQuery(plan, messages) {
+  const { search_queries, user_query } = plan
   const entitiesToExclude = await extractEntitiesFromHistory(messages)
 
   const [pineconeResults, wikipediaResults, searchResultsObj] = await Promise.all([
-    fetchPineconeContext(rewrittenQuery, entitiesToSearch, entitiesToExclude),
-    fetchValidatedWikipediaContext(entitiesToSearch),
-    getGoogleSearchResults(rewrittenQuery),
+    fetchPineconeContext(search_queries, entitiesToExclude),
+    fetchValidatedWikipediaContext(search_queries),
+    getGoogleSearchResults(user_query),
   ])
 
   const searchResults = searchResultsObj.success ? searchResultsObj.results : []
@@ -198,8 +168,6 @@ export async function retrieveContextForQuery(messages) {
   console.groupEnd()
 
   return {
-    rewrittenQuery,
-    entities: entitiesToSearch,
     ragResults: pineconeResults,
     wikiResults: wikipediaResults,
     searchResults: searchResults,

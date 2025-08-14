@@ -1,4 +1,4 @@
-// src/components/ArticlesView.jsx (version 5.0)
+// src/components/ArticlesView.jsx (version 5.2)
 'use client'
 
 import { useMemo } from 'react'
@@ -10,44 +10,56 @@ import { getArticles, deleteArticle } from '@/actions/articles'
 import { useRealtimeUpdates } from '@/hooks/use-realtime-updates'
 import { LoadingOverlay } from './LoadingOverlay'
 
-export function ArticlesView({ searchParams }) {
+export function ArticlesView({ initialArticles, searchParams }) {
   const queryClient = useQueryClient()
   const queryKey = useMemo(() => ['articles', searchParams], [searchParams])
 
-  // useInfiniteQuery handles fetching, pagination, and caching
-  const { data, fetchNextPage, hasNextPage, isLoading, isFetching, isError } =
-    useInfiniteQuery({
-      queryKey: queryKey,
-      queryFn: ({ pageParam = 1 }) =>
-        getArticles({
-          page: pageParam,
-          filters: { q: searchParams.q, country: searchParams.country },
-          sort: searchParams.sort,
-        }),
-      getNextPageParam: (lastPage, allPages) => {
-        // If the last page had results, there might be a next page.
-        return lastPage.length > 0 ? allPages.length + 1 : undefined
-      },
-      initialPageParam: 1,
-    })
+  const { data, fetchNextPage, hasNextPage, isFetching, isError } = useInfiniteQuery({
+    queryKey: queryKey,
+    queryFn: ({ pageParam = 1 }) =>
+      getArticles({
+        page: pageParam,
+        filters: { q: searchParams.q, country: searchParams.country },
+        sort: searchParams.sort,
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.length > 0 ? (data?.pages.length ?? 0) + 1 : undefined,
+    initialPageParam: 1,
+    initialData: {
+      pages: [initialArticles],
+      pageParams: [1],
+    },
+    staleTime: 60 * 1000,
+  })
 
-  // useMutation handles the delete action and automatically updates the UI
   const { mutate: performDelete } = useMutation({
     mutationFn: deleteArticle,
-    onSuccess: (result, articleId) => {
-      if (result.success) {
-        toast.success(result.message)
-        queryClient.invalidateQueries({ queryKey })
-      } else {
-        toast.error(result.message)
-      }
+    onMutate: async (articleIdToDelete) => {
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData(queryKey)
+      queryClient.setQueryData(queryKey, (oldData) => {
+        if (!oldData) return { pages: [], pageParams: [] }
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page) =>
+            page.filter((article) => article._id !== articleIdToDelete)
+          ),
+        }
+      })
+      toast.success('Article removed.')
+      return { previousData }
     },
-    onError: (error) => {
-      toast.error(`Failed to delete article: ${error.message}`)
+    onError: (err, articleId, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData)
+      }
+      toast.error('Failed to delete article. Restoring.')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 
-  // Activate real-time updates which will invalidate the query on new data
   useRealtimeUpdates({
     channel: 'articles-channel',
     event: 'new-article',

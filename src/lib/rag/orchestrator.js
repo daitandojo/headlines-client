@@ -1,6 +1,5 @@
-// src/lib/rag/orchestrator.js (version 4.0)
+// src/lib/rag/orchestrator.js (version 4.1)
 import { retrieveContextForQuery } from './retrieval'
-import { assessContextQuality } from './validation'
 import { generateFinalResponse } from './generation'
 import { runPlannerAgent } from './planner'
 
@@ -19,7 +18,8 @@ export async function processChatRequest(messages) {
 
   // 2. Retrieval Phase
   console.log('[RAG Pipeline] Step 2: Retrieval Phase Started...')
-  const context = await retrieveContextForQuery(plan.search_queries, messages)
+  // CORRECTED: Pass the entire 'plan' object, not just the search_queries.
+  const context = await retrieveContextForQuery(plan, messages)
   console.log('[RAG Pipeline] Step 2: Retrieval Phase Completed.')
 
   // 3. Synthesis Phase

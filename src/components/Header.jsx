@@ -1,11 +1,11 @@
-// src/components/Header.jsx (version 1.4)
+// src/components/Header.jsx (version 1.5)
 'use client'
 
 import { Briefcase } from 'lucide-react'
 import { InstallPwaButton } from '@/components/InstallPwaButton'
 import { PushNotificationManager } from '@/components/PushNotificationManager'
 
-export const Header = ({ articleCount, eventCount }) => {
+export const Header = ({ articleCount, eventCount, opportunityCount }) => {
   return (
     <header className="mb-4 sm:mb-6 relative">
       <div className="absolute top-2 right-2 flex items-center gap-1">
@@ -21,9 +21,14 @@ export const Header = ({ articleCount, eventCount }) => {
       </div>
 
       <p className="text-center text-sm sm:text-base text-slate-400 max-w-3xl mx-auto">
-        Search, analyze, chat...
+        Analyze
         <span className="font-bold text-slate-300"> {eventCount?.toLocaleString()} </span>
-        events from
+        events,
+        <span className="font-bold text-slate-300">
+          {' '}
+          {opportunityCount?.toLocaleString()}{' '}
+        </span>
+        opportunities, from
         <span className="font-bold text-slate-300">
           {' '}
           {articleCount?.toLocaleString()}{' '}

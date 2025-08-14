@@ -1,4 +1,4 @@
-// src/components/OpportunitiesView.jsx (version 11.0)
+// src/components/OpportunitiesView.jsx (version 12.0)
 'use client'
 
 import { useMemo } from 'react'
@@ -34,43 +34,49 @@ export function OpportunitiesView({
   const queryKey = useMemo(() => ['opportunities', searchParams], [searchParams])
   const currentCountry = searchParams.country || 'all'
 
-  const { data, fetchNextPage, hasNextPage, isLoading, isFetching, isError } =
-    useInfiniteQuery({
-      queryKey: queryKey,
-      queryFn: ({ pageParam = 1 }) =>
-        getOpportunities({
-          page: pageParam,
-          filters: { country: searchParams.country },
-        }),
-      getNextPageParam: (lastPage, allPages) => {
-        return lastPage.length > 0 ? allPages.length + 1 : undefined
-      },
-      initialPageParam: 1,
-      initialData: {
-        pages: [initialOpportunities],
-        pageParams: [1],
-      },
-    })
-
-  const { mutate: performDelete } = useMutation({
-    mutationFn: deleteOpportunity,
-    onSuccess: (result, opportunityId) => {
-      if (result.success) {
-        toast.success(result.message)
-        queryClient.setQueryData(queryKey, (oldData) => {
-          if (!oldData) return oldData
-          return {
-            ...oldData,
-            pages: oldData.pages.map((page) =>
-              page.filter((opp) => opp._id !== opportunityId)
-            ),
-          }
-        })
-      } else {
-        toast.error(result.message)
-      }
+  const { data, fetchNextPage, hasNextPage, isFetching, isError } = useInfiniteQuery({
+    queryKey: queryKey,
+    queryFn: ({ pageParam = 1 }) =>
+      getOpportunities({
+        page: pageParam,
+        filters: { country: searchParams.country },
+      }),
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage.length > 0 ? allPages.length + 1 : undefined
     },
-    onError: (error) => toast.error(`Deletion failed: ${error.message}`),
+    initialPageParam: 1,
+    initialData: {
+      pages: [initialOpportunities],
+      pageParams: [1],
+    },
+  })
+
+  const { mutate: performDelete, isPending: isDeleting } = useMutation({
+    mutationFn: deleteOpportunity,
+    onMutate: async (opportunityIdToDelete) => {
+      await queryClient.cancelQueries({ queryKey })
+      const previousData = queryClient.getQueryData(queryKey)
+      queryClient.setQueryData(queryKey, (oldData) => {
+        if (!oldData) return { pages: [], pageParams: [] }
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page) =>
+            page.filter((opp) => opp._id !== opportunityIdToDelete)
+          ),
+        }
+      })
+      toast.success('Opportunity removed.')
+      return { previousData }
+    },
+    onError: (err, oppId, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData)
+      }
+      toast.error('Failed to delete opportunity. Restoring.')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey })
+    },
   })
 
   const handleCountryChange = (value) => {
@@ -139,6 +145,7 @@ export function OpportunitiesView({
                   <OpportunityCard
                     opportunity={opportunity}
                     onDelete={() => performDelete(opportunity._id)}
+                    isDeleting={isDeleting}
                   />
                 </motion.div>
               ))}
