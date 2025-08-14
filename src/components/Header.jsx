@@ -1,9 +1,9 @@
 // src/components/Header.jsx (version 1.4)
-"use client";
+'use client'
 
-import { Briefcase } from 'lucide-react';
-import { InstallPwaButton } from '@/components/InstallPwaButton';
-import { PushNotificationManager } from '@/components/PushNotificationManager';
+import { Briefcase } from 'lucide-react'
+import { InstallPwaButton } from '@/components/InstallPwaButton'
+import { PushNotificationManager } from '@/components/PushNotificationManager'
 
 export const Header = ({ articleCount, eventCount }) => {
   return (
@@ -19,14 +19,17 @@ export const Header = ({ articleCount, eventCount }) => {
           Headlines<span className="hidden sm:inline"> Intelligence</span>
         </h1>
       </div>
-      
+
       <p className="text-center text-sm sm:text-base text-slate-400 max-w-3xl mx-auto">
-        Search & analyze 
-        <span className="font-bold text-slate-300"> {eventCount?.toLocaleString()} </span> 
-        events from 
-        <span className="font-bold text-slate-300"> {articleCount?.toLocaleString()} </span> 
+        Search, analyze, chat...
+        <span className="font-bold text-slate-300"> {eventCount?.toLocaleString()} </span>
+        events from
+        <span className="font-bold text-slate-300">
+          {' '}
+          {articleCount?.toLocaleString()}{' '}
+        </span>
         articles.
       </p>
     </header>
-  );
-};
+  )
+}

@@ -3,7 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { cn } from '@/lib/utils'
 import { Toaster } from '@/components/ui/sonner'
-import { ServiceWorkerRegistrar } from '@/components/ServiceWorkerRegistrar'
+import Script from 'next/script'
 
 const fontSans = Inter({
   subsets: ['latin'],
@@ -36,7 +36,18 @@ export default function RootLayout({ children }) {
       <body className={cn('min-h-screen font-sans antialiased', fontSans.variable)}>
         {children}
         <Toaster />
-        <ServiceWorkerRegistrar />
+        <Script id="sw-registrar" strategy="lazyOnload">
+          {`
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', () => {
+                navigator.serviceWorker
+                  .register('/sw.js')
+                  .then((registration) => console.log('[SW Registrar] Service Worker registered:', registration.scope))
+                  .catch((error) => console.error('[SW Registrar] Registration failed:', error));
+              });
+            }
+          `}
+        </Script>
       </body>
     </html>
   )

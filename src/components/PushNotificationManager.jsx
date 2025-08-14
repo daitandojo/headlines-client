@@ -1,4 +1,4 @@
-// src/components/PushNotificationManager.jsx (version 5.0)
+// src/components/PushNotificationManager.jsx (version 6.0)
 'use client'
 
 import { Button } from './ui/button'
@@ -10,31 +10,19 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { usePushManager } from '@/hooks/use-push-manager'
-import { useEffect } from 'react'
 
 export function PushNotificationManager() {
-  const {
-    isSupported,
-    isSubscribed,
-    isLoading,
-    permission,
-    handleSubscription,
-    initialize, // Checks initial, synchronous state
-  } = usePushManager()
+  // This hook now self-initializes via its own useEffect.
+  // The component just consumes the state.
+  const { isSupported, isSubscribed, isLoading, subscribe } = usePushManager()
 
-  // On component mount, perform a quick, synchronous check for initial state.
-  useEffect(() => {
-    initialize()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
+  // If push notifications aren't supported by the browser, render nothing.
   if (!isSupported) {
     return null
   }
 
   const getTooltipText = () => {
-    if (isLoading) return 'Processing...'
-    if (permission === 'denied') return 'Notifications blocked in browser settings'
+    if (isLoading) return 'Initializing notifications...'
     if (isSubscribed) return 'Notifications are enabled'
     return 'Enable push notifications'
   }
@@ -46,8 +34,8 @@ export function PushNotificationManager() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleSubscription}
-            disabled={isLoading || permission === 'denied'}
+            onClick={subscribe}
+            disabled={isLoading || isSubscribed}
             aria-label={getTooltipText()}
           >
             {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
