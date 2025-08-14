@@ -1,4 +1,4 @@
-// src/components/EventsView.jsx (version 1.2)
+// src/components/EventsView.jsx (version 1.3)
 'use client'
 
 import { useMemo } from 'react'
@@ -22,8 +22,8 @@ export function EventsView({ initialEvents, searchParams }) {
         filters: { q: searchParams.q, country: searchParams.country },
         sort: searchParams.sort,
       }),
-    getNextPageParam: (lastPage) =>
-      lastPage.length > 0 ? (data?.pages.length ?? 0) + 1 : undefined,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length > 0 ? allPages.length + 1 : undefined,
     initialPageParam: 1,
     initialData: {
       pages: [initialEvents],
