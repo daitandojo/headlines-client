@@ -1,12 +1,11 @@
-// src/actions/opportunities.js (version 4.0)
+// src/actions/opportunities.js (version 4.1)
 'use server'
 
 import dbConnect from '@/lib/mongodb'
 import Opportunity from '@/models/Opportunity'
 import Article from '@/models/Article'
 import { revalidatePath } from 'next/cache'
-
-const OPPORTUNITIES_PER_PAGE = 10
+import { OPPORTUNITIES_PER_PAGE } from '@/config/constants'
 
 /**
  * Fetches opportunities with pagination and filtering.

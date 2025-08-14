@@ -1,7 +1,7 @@
-// src/components/OpportunitiesView.jsx (version 8.0)
+// src/components/OpportunitiesView.jsx (version 11.0)
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useMemo } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { OpportunityCard } from '@/components/OpportunityCard'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,22 +14,64 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { InfiniteScrollLoader } from '@/components/InfiniteScrollLoader'
-import { getOpportunities } from '@/actions/opportunities'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getOpportunities, deleteOpportunity } from '@/actions/opportunities'
+import { toast } from 'sonner'
+import { AnimatedList, itemVariants } from './AnimatedList'
+import { LoadingOverlay } from './LoadingOverlay'
 
 export function OpportunitiesView({
-  initialOpportunities,
   uniqueCountries,
-  totalCount,
   searchParams,
+  initialOpportunities,
+  totalCount,
 }) {
-  const [opportunities, setOpportunities] = useState(initialOpportunities)
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(initialOpportunities.length < totalCount)
-  const [isLoading, setIsLoading] = useState(false)
-
+  const queryClient = useQueryClient()
   const router = useRouter()
   const pathname = usePathname()
+
+  const queryKey = useMemo(() => ['opportunities', searchParams], [searchParams])
   const currentCountry = searchParams.country || 'all'
+
+  const { data, fetchNextPage, hasNextPage, isLoading, isFetching, isError } =
+    useInfiniteQuery({
+      queryKey: queryKey,
+      queryFn: ({ pageParam = 1 }) =>
+        getOpportunities({
+          page: pageParam,
+          filters: { country: searchParams.country },
+        }),
+      getNextPageParam: (lastPage, allPages) => {
+        return lastPage.length > 0 ? allPages.length + 1 : undefined
+      },
+      initialPageParam: 1,
+      initialData: {
+        pages: [initialOpportunities],
+        pageParams: [1],
+      },
+    })
+
+  const { mutate: performDelete } = useMutation({
+    mutationFn: deleteOpportunity,
+    onSuccess: (result, opportunityId) => {
+      if (result.success) {
+        toast.success(result.message)
+        queryClient.setQueryData(queryKey, (oldData) => {
+          if (!oldData) return oldData
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page) =>
+              page.filter((opp) => opp._id !== opportunityId)
+            ),
+          }
+        })
+      } else {
+        toast.error(result.message)
+      }
+    },
+    onError: (error) => toast.error(`Deletion failed: ${error.message}`),
+  })
 
   const handleCountryChange = (value) => {
     const params = new URLSearchParams(window.location.search)
@@ -41,54 +83,24 @@ export function OpportunitiesView({
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
-  useEffect(() => {
-    setOpportunities(initialOpportunities)
-    setPage(1)
-    setHasMore(initialOpportunities.length < totalCount)
-  }, [initialOpportunities, totalCount])
-
-  const loadMoreOpportunities = useCallback(async () => {
-    if (isLoading || !hasMore) return
-    setIsLoading(true)
-    const nextPage = page + 1
-    const newOpportunities = await getOpportunities({
-      page: nextPage,
-      filters: { country: searchParams.country },
-    })
-    if (newOpportunities.length > 0) {
-      setOpportunities((prev) => [...prev, ...newOpportunities])
-      setPage(nextPage)
-    }
-    setHasMore(opportunities.length + newOpportunities.length < totalCount)
-    setIsLoading(false)
-  }, [isLoading, hasMore, page, searchParams, opportunities.length, totalCount])
-
-  const handleOpportunityDeleted = useCallback((opportunityId) => {
-    setOpportunities((current) => current.filter((opp) => opp._id !== opportunityId))
-  }, [])
-
-  const handleDeletionFailed = useCallback((failedOpportunity) => {
-    setOpportunities((current) => [failedOpportunity, ...current])
-  }, [])
+  const opportunities = data?.pages.flat() ?? []
+  const showLoadingOverlay = isFetching && opportunities.length === 0
 
   return (
     <div className="space-y-6">
-      {/* --- RE-ARCHITECTED RESPONSIVE HEADER --- */}
+      <LoadingOverlay isLoading={showLoadingOverlay} text="Fetching Opportunities..." />
+
       <Card className="bg-slate-900/50 border-slate-700/80">
-        {/* The CardContent's flex direction changes based on screen size */}
         <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 gap-4">
-          {/* Left side: Title and Description */}
           <div>
             <h2 className="text-xl sm:text-2xl font-bold">
-              Actionable Opportunities ({opportunities.length} of {totalCount})
+              {totalCount} Actionable Opportunities
             </h2>
-            {/* The description is now hidden on mobile (`hidden`) and visible on larger screens (`sm:block`) */}
             <p className="hidden sm:block text-sm text-slate-400 mt-1">
               A curated list of individuals and entities that have experienced a
               significant wealth event.
             </p>
           </div>
-          {/* Right side: Filter */}
           <div className="w-full sm:max-w-xs">
             <Label htmlFor="country-filter" className="text-slate-300 text-xs">
               Filter by Country
@@ -112,28 +124,44 @@ export function OpportunitiesView({
           </div>
         </CardContent>
       </Card>
-      {/* --- End Responsive Header --- */}
 
-      <div className="space-y-3">
-        {opportunities.map((opportunity) => (
-          <OpportunityCard
-            key={opportunity._id}
-            opportunity={opportunity}
-            onOpportunityDeleted={handleOpportunityDeleted}
-            onDeletionFailed={handleDeletionFailed}
-          />
-        ))}
-      </div>
+      {!showLoadingOverlay && (
+        <div className="sm:px-0 -mx-4 px-4">
+          <AnimatedList className="space-y-3">
+            <AnimatePresence>
+              {opportunities.map((opportunity) => (
+                <motion.div
+                  key={opportunity._id}
+                  variants={itemVariants}
+                  exit={itemVariants.exit}
+                  layout
+                >
+                  <OpportunityCard
+                    opportunity={opportunity}
+                    onDelete={() => performDelete(opportunity._id)}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </AnimatedList>
+        </div>
+      )}
 
-      <InfiniteScrollLoader onLoadMore={loadMoreOpportunities} hasMore={hasMore} />
+      <InfiniteScrollLoader onLoadMore={fetchNextPage} hasMore={hasNextPage} />
 
-      {!hasMore && opportunities.length > 0 && (
+      {!hasNextPage && opportunities.length > 0 && !showLoadingOverlay && (
         <p className="text-center text-slate-500 text-sm py-4">End of list.</p>
       )}
 
-      {opportunities.length === 0 && !isLoading && (
+      {opportunities.length === 0 && !isFetching && (
         <div className="text-center text-gray-500 py-20 rounded-lg bg-black/20 border border-white/10">
           <p>No opportunities found for the selected filter.</p>
+        </div>
+      )}
+
+      {isError && (
+        <div className="text-center text-red-400 py-20">
+          <p>Failed to load opportunities. Please try again later.</p>
         </div>
       )}
     </div>

@@ -1,29 +1,35 @@
-// src/lib/rag/orchestrator.js (version 1.0)
-import { retrieveContextForQuery } from './retrieval';
-import { assessContextQuality, crossValidateSources } from './validation';
-import { generateFinalResponse } from './generation';
+// src/lib/rag/orchestrator.js (version 4.0)
+import { retrieveContextForQuery } from './retrieval'
+import { assessContextQuality } from './validation'
+import { generateFinalResponse } from './generation'
+import { runPlannerAgent } from './planner'
 
 /**
- * Main orchestrator for the RAG chat pipeline.
+ * Main orchestrator for the Agentic RAG chat pipeline.
  * @param {Array<object>} messages - The chat messages from the client.
- * @returns {Promise<StreamingTextResponse|Response>} The final response object for the API route.
+ * @returns {Promise<string>} The final, validated text response.
  */
 export async function processChatRequest(messages) {
-    // 1. Retrieval Phase
-    const context = await retrieveContextForQuery(messages);
+  console.log('--- [RAG Pipeline Start] ---')
 
-    // 2. Validation & Quality Assessment Phase
-    const contextQuality = assessContextQuality(context.ragResults, context.wikiResults);
-    const sourceValidation = crossValidateSources(context.ragResults, context.wikiResults);
-    
-    const fullContext = { ...context, contextQuality };
+  // 1. Planning Phase
+  console.log('[RAG Pipeline] Step 1: Planning Phase Started...')
+  const plan = await runPlannerAgent(messages)
+  console.log('[RAG Pipeline] Step 1: Planning Phase Completed.')
 
-    // 3. Generation Phase
-    const finalResponse = await generateFinalResponse({
-        context: fullContext,
-        sourceValidation,
-        messages
-    });
+  // 2. Retrieval Phase
+  console.log('[RAG Pipeline] Step 2: Retrieval Phase Started...')
+  const context = await retrieveContextForQuery(plan.search_queries, messages)
+  console.log('[RAG Pipeline] Step 2: Retrieval Phase Completed.')
 
-    return finalResponse;
+  // 3. Synthesis Phase
+  console.log('[RAG Pipeline] Step 3: Synthesis Phase Started...')
+  const finalResponseText = await generateFinalResponse({
+    plan,
+    context,
+  })
+  console.log('[RAG Pipeline] Step 3: Synthesis Phase Completed.')
+
+  console.log('--- [RAG Pipeline End] ---')
+  return finalResponseText
 }

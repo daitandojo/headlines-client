@@ -1,8 +1,8 @@
-// src/app/login/actions.js (version 2.0)
+// src/actions/auth.js
 'use server'
 
 import { cookies } from 'next/headers'
-import { env } from '@/lib/env.mjs' // Import centralized env
+import { env } from '@/lib/env.mjs' // <-- Import the validated env object
 
 const COOKIE_NAME = 'headlines-auth'
 
@@ -12,10 +12,8 @@ const COOKIE_NAME = 'headlines-auth'
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 export async function login(password) {
-  // Case-insensitive password check against environment variable
   if (password.toLowerCase() === env.LOGIN_PASSWORD.toLowerCase()) {
     console.log('[Auth] Login successful. Setting auth cookie.')
-    // Password is correct. Set the secure, httpOnly cookie.
     cookies().set({
       name: COOKIE_NAME,
       value: env.COOKIE_SECRET,
@@ -27,7 +25,6 @@ export async function login(password) {
     return { success: true }
   } else {
     console.warn('[Auth] Login failed: Incorrect password attempt.')
-    // Password is incorrect.
     return { success: false, error: 'Incorrect password.' }
   }
 }

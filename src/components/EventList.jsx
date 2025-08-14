@@ -1,12 +1,26 @@
-import { Accordion } from '@/components/ui/accordion';
-import { SynthesizedEventCard } from '@/components/SynthesizedEventCard';
+// src/components/EventList.jsx (version 4.0)
+import { Accordion } from '@/components/ui/accordion'
+import { SynthesizedEventCard } from '@/components/SynthesizedEventCard'
+import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatedList, itemVariants } from './AnimatedList'
 
-export const EventList = ({ events }) => {
+export const EventList = ({ events, onDelete }) => {
   return (
-    <Accordion type="single" collapsible className="w-full space-y-4">
-      {events.map((event) => (
-        <SynthesizedEventCard key={event.event_key} event={event} />
-      ))}
+    <Accordion type="single" collapsible>
+      <AnimatedList className="w-full space-y-4">
+        <AnimatePresence>
+          {events.map((event) => (
+            <motion.div
+              key={event.event_key}
+              variants={itemVariants}
+              exit={itemVariants.exit}
+              layout
+            >
+              <SynthesizedEventCard event={event} onDelete={() => onDelete(event._id)} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </AnimatedList>
     </Accordion>
-  );
-};
+  )
+}

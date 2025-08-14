@@ -1,4 +1,4 @@
-// src/app/(main)/events/page.js (version 2.0)
+// src/app/(main)/events/page.js (version 2.1)
 import { Suspense } from 'react'
 import { EventsView } from '@/components/EventsView'
 import { GlobalFilters } from '@/components/GlobalFilters'
@@ -41,7 +41,7 @@ export default async function EventsPage({ searchParams }) {
 }
 
 const SkeletonLoader = ({ count }) => (
-  <div className="max-w-5xl mx-auto space-y-4">
+  <div className="max-w-5xl mx-auto space-y-4 px-4 sm:px-0">
     {Array.from({ length: count }).map((_, i) => (
       <SkeletonCard key={i} />
     ))}

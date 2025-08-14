@@ -1,4 +1,4 @@
-// src/actions/events.js (version 2.0)
+// src/actions/events.js (version 2.1)
 'use server'
 
 import dbConnect from '@/lib/mongodb'

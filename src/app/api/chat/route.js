@@ -1,34 +1,40 @@
-// src/app/api/chat/route.js (version 3.0)
-import { processChatRequest } from '@/lib/rag/orchestrator';
-import { logQuery, startTimer } from '@/lib/monitoring';
+// src/app/api/chat/route.js (version 6.0)
+import { processChatRequest } from '@/lib/rag/orchestrator'
+import { logQuery, startTimer } from '@/lib/monitoring'
+
+// This API route is now NON-STREAMING to ensure response accuracy.
+// It prioritizes correctness over low-latency streaming.
 
 export async function POST(req) {
-    const overallTimer = await startTimer('overall_request');
-    let queryForLogging = 'unknown';
+  const overallTimer = await startTimer('overall_request')
+  let queryForLogging = 'unknown'
 
-    try {
-        const { messages } = await req.json();
-        queryForLogging = messages[messages.length - 1].content;
-        
-        // Delegate all complex logic to the RAG orchestrator
-        const response = await processChatRequest(messages);
-        
-        // The orchestrator returns a complete Response object (e.g., StreamingTextResponse)
-        return response;
+  try {
+    const { messages } = await req.json()
+    queryForLogging = messages[messages.length - 1].content
 
-    } catch (error) {
-        console.error('[CHAT API Top-Level Error]', error);
-        
-        const responseTime = await overallTimer.end({ error: true });
-        
-        // Log the failed query
-        await logQuery({
-            query: queryForLogging,
-            responseTime,
-            confidenceLevel: 'error',
-            error: error.message
-        });
-        
-        return new Response('An error occurred while processing your request. Please check the server logs for details.', { status: 500 });
-    }
+    // Delegate all complex logic to the RAG orchestrator.
+    // This now returns a final, validated string.
+    const responseText = await processChatRequest(messages)
+
+    // Return the response as a simple text payload.
+    // The `useChat` hook on the client will handle this non-streaming response.
+    return new Response(responseText)
+  } catch (error) {
+    console.error('[CHAT API Top-Level Error]', error)
+
+    const responseTime = await overallTimer.end({ error: true })
+
+    // Log the failed query
+    await logQuery({
+      query: queryForLogging,
+      responseTime,
+      confidenceLevel: 'error',
+      error: error.message,
+    })
+
+    const errorMessage =
+      'An error occurred while processing your request. Please check the server logs for details.'
+    return new Response(errorMessage, { status: 500 })
+  }
 }

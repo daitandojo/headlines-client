@@ -1,92 +1,142 @@
-// src/components/ChatView.jsx (version 2.1)
-"use client";
+// src/components/ChatView.jsx (version 8.0)
+'use client'
 
-import { useChat } from 'ai/react';
-import { useEffect, useRef } from 'react';
-import { Card } from '@/components/ui/card';
-import { ChatMessage } from '@/components/chat/ChatMessage';
-import { ChatInput } from '@/components/chat/ChatInput';
-import { ChatScrollAnchor } from '@/components/chat/ChatScrollAnchor';
-import { ChatThinkingIndicator } from '@/components/chat/ChatThinkingIndicator';
-import { useAppStore } from '@/store/use-app-store';
-import { generateChatTitle } from '@/actions/chat';
+import { useState, useEffect, useRef } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { Card } from '@/components/ui/card'
+import { ChatMessage } from '@/components/chat/ChatMessage'
+import { ChatInput } from '@/components/chat/ChatInput'
+import { ChatScrollAnchor } from '@/components/chat/ChatScrollAnchor'
+import { ChatLoadingIndicator } from '@/components/chat/ChatLoadingIndicator'
+import useAppStore from '@/store/use-app-store'
+import { generateChatTitle } from '@/actions/chat'
+
+async function postChatMessage(messages) {
+  const sanitizedMessages = messages.map(({ role, content }) => ({ role, content }))
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages: sanitizedMessages }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(errorText || 'Failed to get a response from the server.')
+  }
+  return response.text()
+}
 
 export function ChatView({ chatId, updateChatTitle, getMessages, setMessages }) {
-    const inputRef = useRef(null);
-    const { chatContextPrompt, setChatContextPrompt } = useAppStore(state => ({
-        chatContextPrompt: state.chatContextPrompt,
-        setChatContextPrompt: state.setChatContextPrompt
-    }));
-    
-    const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, append } = useChat({
-        id: chatId,
-        api: '/api/chat',
-        initialMessages: getMessages(chatId),
-        onFinish: async (message) => {
-            // The `messages` array from the hook is the source of truth.
-            // At this point, it already contains the user's message and the complete assistant message.
-            setMessages(chatId, messages);
+  const [input, setInput] = useState('')
+  const [isThinking, setIsThinking] = useState(false) // Explicit state for loading UI
+  const inputRef = useRef(null)
+  const { chatContextPrompt, setChatContextPrompt } = useAppStore((state) => ({
+    chatContextPrompt: state.chatContextPrompt,
+    setChatContextPrompt: state.setChatContextPrompt,
+  }))
 
-            // --- BUG FIX ---
-            // The check is now performed on the `messages` array directly.
-            // A new chat's first exchange will result in messages.length being exactly 2.
-            if (messages.length === 2) {
-                const result = await generateChatTitle(messages);
-                if (result.success) {
-                    updateChatTitle(chatId, result.title);
-                }
-            }
-            // --- END BUG FIX ---
-        },
-    });
+  const messages = getMessages(chatId)
 
-    useEffect(() => {
-        if (!isLoading && inputRef.current) {
-            setTimeout(() => {
-                inputRef.current.focus();
-            }, 100);
-        }
-    }, [isLoading]);
+  const { mutate: sendMessage } = useMutation({
+    mutationFn: postChatMessage,
+    onSuccess: (assistantResponse, newMessages) => {
+      const finalMessages = [
+        ...newMessages,
+        { role: 'assistant', content: assistantResponse, id: `asst_${Date.now()}` },
+      ]
+      setMessages(chatId, finalMessages)
 
-    useEffect(() => {
-        if (chatContextPrompt) {
-            const userMessage = { role: 'user', content: chatContextPrompt };
-            append(userMessage);
-            setChatContextPrompt('');
-        }
-    }, [chatContextPrompt, append, setChatContextPrompt]);
-    
-    const customHandleSubmit = (e) => {
-        e.preventDefault();
-        handleSubmit(e);
-    };
+      if (finalMessages.length === 2) {
+        generateChatTitle(finalMessages).then((result) => {
+          if (result.success) {
+            updateChatTitle(chatId, result.title)
+          }
+        })
+      }
+    },
+    onError: (error, originalMessages) => {
+      toast.error(`An error occurred: ${error.message}`)
+      setMessages(chatId, originalMessages.slice(0, -1))
+    },
+    onSettled: () => {
+      // This runs on both success and error, ensuring the spinner is always hidden.
+      setIsThinking(false)
+    },
+  })
 
-    return (
-        <div className="flex-grow flex flex-col justify-between h-full min-h-0">
-            <Card className="bg-black/20 backdrop-blur-sm border border-white/10 shadow-2xl shadow-black/30 h-full flex flex-col">
-                <div className="flex-grow overflow-y-auto p-4 space-y-6 custom-scrollbar">
-                    {messages.length === 0 && !isLoading && (
-                        <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                            <p className="text-lg">Ask anything about the knowledge base.</p>
-                        </div>
-                    )}
-                    {messages.map(m => (
-                        <ChatMessage key={m.id} message={m} />
-                    ))}
-                    {isLoading && <ChatThinkingIndicator status="Thinking..." />}
-                    <ChatScrollAnchor messages={messages} />
-                </div>
-                <div className="px-4 pb-4">
-                    <ChatInput 
-                        inputRef={inputRef}
-                        input={input}
-                        setInput={setInput}
-                        handleInputChange={handleInputChange}
-                        handleSubmit={customHandleSubmit}
-                        isLoading={isLoading}
-                    />
-                </div>
-            </Card>
+  useEffect(() => {
+    if (!isThinking && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current.focus()
+      }, 100)
+    }
+  }, [isThinking])
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!input.trim() || isThinking) return
+
+    setIsThinking(true) // Show spinner immediately
+    const userMessage = { role: 'user', content: input, id: `user_${Date.now()}` }
+    const newMessages = [...messages, userMessage]
+
+    setMessages(chatId, newMessages)
+    sendMessage(newMessages)
+    setInput('')
+  }
+
+  useEffect(() => {
+    if (chatContextPrompt && !isThinking) {
+      setIsThinking(true) // Show spinner immediately
+      const userMessage = {
+        role: 'user',
+        content: chatContextPrompt,
+        id: `user_ctx_${Date.now()}`,
+      }
+      const newMessages = [...getMessages(chatId), userMessage]
+
+      setMessages(chatId, newMessages)
+      sendMessage(newMessages)
+
+      setChatContextPrompt('')
+    }
+  }, [
+    chatContextPrompt,
+    isThinking,
+    chatId,
+    getMessages,
+    setMessages,
+    sendMessage,
+    setChatContextPrompt,
+  ])
+
+  return (
+    <div className="flex-grow flex flex-col justify-between h-full min-h-0">
+      <Card className="bg-black/20 backdrop-blur-sm border border-white/10 shadow-2xl shadow-black/30 h-full flex flex-col">
+        <div className="flex-grow overflow-y-auto p-4 space-y-6 custom-scrollbar">
+          {messages.length === 0 && !isThinking && (
+            <div className="flex flex-col items-center justify-center h-full text-slate-500">
+              <p className="text-lg">Ask anything about the knowledge base.</p>
+            </div>
+          )}
+          {messages.map((m, i) => (
+            <ChatMessage key={m.id || `msg-${i}`} message={m} />
+          ))}
+          {isThinking && <ChatLoadingIndicator />}
+          <ChatScrollAnchor messages={messages} />
         </div>
-    );
+        <div className="px-4 pb-4">
+          <ChatInput
+            inputRef={inputRef}
+            input={input}
+            setInput={setInput}
+            handleInputChange={(e) => setInput(e.target.value)}
+            handleSubmit={handleSubmit}
+            isLoading={isThinking} // Disable input while thinking
+          />
+        </div>
+      </Card>
+    </div>
+  )
 }

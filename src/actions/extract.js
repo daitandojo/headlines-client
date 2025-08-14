@@ -1,20 +1,26 @@
-"use server";
+// src/actions/extract.js
+'use server';
 
 import OpenAI from 'openai';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { COMMON_COUNTRIES } from '@/lib/countries';
 import { fetchWikipediaSummary } from '@/lib/wikipedia';
+import { env } from '@/lib/env.mjs'; // <-- Import the validated env object
 
-// Initialize GROQ Client
-if (!process.env.GROQ_API_KEY) {
-    throw new Error('GROQ API Key is missing');
+let groq;
+function getGroqClient() {
+  if (!groq) {
+    groq = new OpenAI({
+      apiKey: env.GROQ_API_KEY,
+      baseURL: 'https://api.groq.com/openai/v1',
+    });
+  }
+  return groq;
 }
-const groq = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1' });
 
-// --- Models ---
-const QUERY_PLANNER_MODEL = 'openai/gpt-oss-20b';
-const ANALYST_MODEL = 'openai/gpt-oss-120b';
+const QUERY_PLANNER_MODEL = 'llama3-8b-8192';
+const ANALYST_MODEL = 'llama3-70b-8192';
 
 // --- Agent Prompts ---
 const QUERY_PLANNER_PROMPT = `You are a research planning agent. Your task is to analyze the provided "Article Text" and determine the most critical entities to look up on Wikipedia for factual verification and enrichment.
@@ -46,67 +52,96 @@ Respond ONLY with a valid JSON object with the following structure:
   "business_summary": "The final, synthesized, fact-checked summary, formatted with Markdown."
 }`;
 
-/**
- * Uses an AI Analyst Agent to extract business-savvy information from a URL.
- * @param {string} url The URL to scrape.
- * @returns {Promise<{success: boolean, data?: object, error?: string}>}
- */
 export async function scrapeAndExtractWithAI(url) {
-    if (!url) {
-        return { success: false, error: "URL is required." };
+  const client = getGroqClient();
+  console.log(`[AI Extract] Starting extraction for URL: ${url}`);
+  if (!url) {
+    return { success: false, error: 'URL is required.' };
+  }
+
+  try {
+    console.log('[AI Extract] Fetching and parsing content...');
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+      },
+    });
+    if (!response.ok) {
+      console.error(`[AI Extract] Fetch failed with status: ${response.status}`);
+      return { success: false, error: `Fetch failed: ${response.status}` };
     }
 
-    try {
-        // Step 1: Fetch and extract base text with Readability
-        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36' } });
-        if (!response.ok) return { success: false, error: `Fetch failed: ${response.status}` };
-        
-        const html = await response.text();
-        const doc = new JSDOM(html, { url });
-        const article = new Readability(doc.window.document).parse();
-        if (!article || !article.textContent) return { success: false, error: "Readability could not extract content." };
-        
-        const articleText = article.textContent.trim().substring(0, 12000);
-
-        // Step 2: AI Query Planning Agent decides what to search for
-        const plannerResponse = await groq.chat.completions.create({
-            model: QUERY_PLANNER_MODEL,
-            messages: [
-                { role: 'system', content: QUERY_PLANNER_PROMPT },
-                { role: 'user', content: `Article Text:\n${articleText}` }
-            ],
-            response_format: { type: 'json_object' },
-        });
-        const plan = JSON.parse(plannerResponse.choices[0].message.content);
-        
-        // Step 3: Fetch Wikipedia context for the planned entities
-        const wikipediaPromises = (plan.wikipedia_queries || []).slice(0, 2).map(entity => fetchWikipediaSummary(entity));
-        const wikipediaResults = await Promise.all(wikipediaPromises);
-        const wikipediaContext = wikipediaResults
-            .filter(res => res.success)
-            .map(res => res.summary)
-            .join('\n\n---\n\n');
-
-        // Step 4: AI Analyst Agent performs the final synthesis
-        const finalAnalysis = await groq.chat.completions.create({
-            model: ANALYST_MODEL,
-            messages: [
-                { role: 'system', content: FINAL_SYNTHESIS_PROMPT },
-                { role: 'user', content: `URL: ${url}\n\n---ARTICLE TEXT---\n${articleText}\n\n---WIKIPEDIA CONTEXT---\n${wikipediaContext || 'None'}` }
-            ],
-            response_format: { type: 'json_object' },
-        });
-
-        const finalData = JSON.parse(finalAnalysis.choices[0].message.content);
-
-        if (!finalData.headline || !finalData.business_summary) {
-            return { success: false, error: "AI Analyst could not reliably synthesize a summary." };
-        }
-
-        return { success: true, data: finalData };
-
-    } catch (error) {
-        console.error("AI Extraction Error:", error);
-        return { success: false, error: `An unexpected error occurred: ${error.message}` };
+    const html = await response.text();
+    const doc = new JSDOM(html, { url });
+    const article = new Readability(doc.window.document).parse();
+    if (!article || !article.textContent) {
+      console.error('[AI Extract] Readability could not extract content.');
+      return { success: false, error: 'Readability could not extract content.' };
     }
+
+    const articleText = article.textContent.trim().substring(0, 12000);
+    console.log(`[AI Extract] Extracted ${articleText.length} characters of text.`);
+
+    console.log('[AI Extract] Running Query Planner Agent...');
+    const plannerResponse = await client.chat.completions.create({
+      model: QUERY_PLANNER_MODEL,
+      messages: [
+        { role: 'system', content: QUERY_PLANNER_PROMPT },
+        { role: 'user', content: `Article Text:\n${articleText}` },
+      ],
+      response_format: { type: 'json_object' },
+    });
+    const plan = JSON.parse(plannerResponse.choices[0].message.content);
+    console.log('[AI Extract] Planner decided on queries:', plan.wikipedia_queries);
+
+    console.log('[AI Extract] Fetching Wikipedia context...');
+    const wikipediaPromises = (plan.wikipedia_queries || [])
+      .slice(0, 2)
+      .map((entity) => fetchWikipediaSummary(entity));
+    const wikipediaResults = await Promise.all(wikipediaPromises);
+    const wikipediaContext = wikipediaResults
+      .filter((res) => res.success)
+      .map((res) => res.summary)
+      .join('\n\n---\n\n');
+    console.log(
+      `[AI Extract] Fetched ${wikipediaResults.filter((r) => r.success).length} Wikipedia summaries.`
+    );
+
+    console.log('[AI Extract] Running Final Synthesis Analyst Agent...');
+    const finalAnalysis = await client.chat.completions.create({
+      model: ANALYST_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: FINAL_SYNTHESIS_PROMPT.replace(
+            "[${COMMON_COUNTRIES.join(', ')}]",
+            COMMON_COUNTRIES.join(', ')
+          ),
+        },
+        {
+          role: 'user',
+          content: `URL: ${url}\n\n---ARTICLE TEXT---\n${articleText}\n\n---WIKIPEDIA CONTEXT---\n${wikipediaContext || 'None'}`,
+        },
+      ],
+      response_format: { type: 'json_object' },
+    });
+
+    const finalData = JSON.parse(finalAnalysis.choices[0].message.content);
+    console.log('[AI Extract] Final synthesis complete.');
+
+    if (!finalData.headline || !finalData.business_summary) {
+      console.error('[AI Extract] AI Analyst failed to produce required fields.');
+      return {
+        success: false,
+        error: 'AI Analyst could not reliably synthesize a summary.',
+      };
+    }
+
+    console.log('[AI Extract] Extraction successful.');
+    return { success: true, data: finalData };
+  } catch (error) {
+    console.error('[AI Extraction Error]', error);
+    return { success: false, error: `An unexpected error occurred: ${error.message}` };
+  }
 }

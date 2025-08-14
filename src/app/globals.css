@@ -49,7 +49,7 @@
     --input: 215 27.9% 16.9%;
     --ring: 217 91% 60%;
   }
-  
+
   * {
     border-color: hsl(var(--border));
   }
@@ -57,21 +57,10 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    background-image: radial-gradient(
-        at 27% 37%,
-        hsla(215, 98%, 43%, 0.15) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 97% 21%,
-        hsla(217, 91%, 60%, 0.1) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 52% 99%,
-        hsla(355, 98%, 51%, 0.1) 0px,
-        transparent 50%
-      );
+    background-image:
+      radial-gradient(at 27% 37%, hsla(215, 98%, 43%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 97% 21%, hsla(217, 91%, 60%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 52% 99%, hsla(355, 98%, 51%, 0.1) 0px, transparent 50%);
   }
 
   /* Professional Table Styling for Chat */
@@ -127,11 +116,88 @@
     scrollbar-color: hsl(var(--secondary)) hsl(var(--muted) / 0.5);
   }
 
-  /* --- NEW: Source-Aware Coloring for Chat --- */
-  .rag-source, .wiki-source {
-    color: #a7f3d0; /* A pleasant light green for trusted sources */
+  /* --- Source-Aware Coloring for Chat --- */
+  .rag-source,
+  .wiki-source {
+    color: #a7f3d0;
   }
   .llm-source {
-    color: #fde68a; /* A soft orange for general knowledge */
+    color: #fde68a;
+  }
+
+  /* --- Masked Gradient for Hover Shine Effect --- */
+  .masked-gradient {
+    -webkit-mask-image: radial-gradient(
+      200px 200px at var(--x, 0) var(--y, 0),
+      #000,
+      transparent
+    );
+    mask-image: radial-gradient(
+      200px 200px at var(--x, 0) var(--y, 0),
+      #000,
+      transparent
+    );
+  }
+
+  /* --- Golden Glowing Border for High-Relevance Cards --- */
+  .card-glow {
+    position: relative;
+    overflow: hidden; /* Keep the glow contained */
+  }
+  .card-glow::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: inherit; /* Match parent's border-radius */
+    border: 1px solid transparent;
+    background: conic-gradient(
+        from 180deg at 50% 50%,
+        rgba(252, 211, 77, 0.5) 0deg,
+        rgba(252, 211, 77, 0.2) 50%,
+        rgba(252, 211, 77, 0.5) 360deg
+      )
+      border-box;
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    z-index: 0;
+    animation: glow 4s linear infinite;
+  }
+
+  /* --- Bezier Heartbeat Wobble --- */
+  .impatient-wobble {
+    animation: impatient-wobble 2s cubic-bezier(0.5, 0, 0.1, 1) infinite;
+  }
+
+  @keyframes glow {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* --- NEW: "pum PUM . ." Double-Beat Keyframes --- */
+  @keyframes impatient-wobble {
+    /* The long pause between heartbeats */
+    0%,
+    90%,
+    100% {
+      transform: scale(1) rotate(0deg);
+    }
+    /* The first, smaller beat ("pum") */
+    73% {
+      transform: scale(1.005) rotate(-0.2deg);
+    }
+    /* The second, larger beat ("PUM") */
+    96% {
+      transform: scale(1.012) rotate(0.2deg);
+    }
   }
 }
