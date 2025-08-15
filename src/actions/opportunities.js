@@ -1,14 +1,15 @@
-// src/actions/opportunities.js (version 4.1)
+// src/actions/opportunities.js (version 5.0)
 'use server'
 
 import dbConnect from '@/lib/mongodb'
 import Opportunity from '@/models/Opportunity'
-import Article from '@/models/Article'
+// NOTE: Article model is no longer needed here as we populate from Opportunity
 import { revalidatePath } from 'next/cache'
 import { OPPORTUNITIES_PER_PAGE } from '@/config/constants'
 
 /**
  * Fetches opportunities with pagination and filtering.
+ * Now populates both source article and the new source event.
  * @param {{page?: number, filters?: {country?: string}}} params
  * @returns {Promise<Array<Object>>} A promise that resolves to an array of opportunities.
  */
@@ -24,7 +25,15 @@ export async function getOpportunities({ page = 1, filters = {} }) {
   const skipAmount = (page - 1) * OPPORTUNITIES_PER_PAGE
 
   const opportunities = await Opportunity.find(queryFilter)
+    // Populate the source article with just the essentials
     .populate('sourceArticleId', 'headline link newspaper')
+    // START: ADDED POPULATION FOR THE PARENT EVENT
+    // Populate the source event with everything needed for the context dialog
+    .populate(
+      'sourceEventId',
+      'synthesized_headline synthesized_summary source_articles highest_relevance_score'
+    )
+    // END: ADDED POPULATION
     .sort({ createdAt: -1 })
     .skip(skipAmount)
     .limit(OPPORTUNITIES_PER_PAGE)

@@ -1,4 +1,4 @@
-// src/models/Opportunity.js (version 3.0)
+// src/models/Opportunity.js (version 3.1)
 import mongoose from 'mongoose'
 
 const { Schema, model, models } = mongoose
@@ -19,13 +19,20 @@ const OpportunitySchema = new Schema(
     basedIn: { type: String, trim: true },
     whyContact: { type: String, required: true, trim: true },
     likelyMMDollarWealth: { type: Number, required: true, default: 0 },
-    // REMOVED: The 'status' field is no longer part of the schema.
     sourceArticleId: {
       type: Schema.Types.ObjectId,
       ref: 'Article',
       required: true,
       index: true,
     },
+    // START: ADDED NEW LINK TO PARENT EVENT
+    sourceEventId: {
+      type: Schema.Types.ObjectId,
+      ref: 'SynthesizedEvent',
+      required: true,
+      index: true,
+    },
+    // END: ADDED NEW LINK TO PARENT EVENT
   },
   {
     timestamps: true,
