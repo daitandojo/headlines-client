@@ -4,7 +4,7 @@
 import { callGroqWithRetry } from '@/lib/groq'
 import { PLANNER_PROMPT } from './prompts'
 
-const PLANNER_MODEL = 'openai/gpt-oss-120b'
+const PLANNER_MODEL = 'llama3-70b-8192'
 
 /**
  * A resilient parser that attempts to fix common LLM-induced JSON errors.
@@ -16,10 +16,7 @@ function resilientJSONParse(jsonString) {
   try {
     return JSON.parse(jsonString)
   } catch (e) {
-    console.warn(
-      '[Planner Agent] Initial JSON.parse failed. Attempting cleanup.',
-      e.message
-    )
+    console.warn('[Planner Agent] Initial JSON.parse failed. Attempting cleanup.', e.message)
     // Attempt to fix common errors, like unescaped quotes in search queries
     let cleanedString = jsonString.replace(/""/g, '"\\"')
 

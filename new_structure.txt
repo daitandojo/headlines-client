@@ -1,0 +1,91 @@
+I have made a change to the back end. Events, articles and opportunities are now linked. This means that from the OpportunityCard I can open the articles associated with the opportunities; and if I delete an event, it can ask me if the associated articles also need to be deleted. It can cause a smart interaction and the database will stay cleaner. In brief, let me explain you how the linkage works.
+
+Here is a clear breakdown of how the three models (SynthesizedEvent, Article, and Opportunity) are now linked in the database, creating a fully connected and traceable data structure.
+The New Data Relationship Model
+
+The relationships can be visualized with this simple diagram showing the references (ref) stored in each document:
+code Code
+
+[SynthesizedEvent]
+
+    _id
+
+    source_articles: [ { headline, link, newspaper }, ... ]  // (Embedded data for display)
+
+    ^
+    |
+    | 1-to-1 Link (via sourceEventId)
+    |
+    [Opportunity] ---------------------> [Article]
+
+    _id                                - _id
+
+    sourceEventId: ObjectId          - link
+
+    sourceArticleId: ObjectId
+
+Let's break down the three key links:
+
+    Event to Articles Link
+
+This link allows you to see which raw articles were grouped together to create a single, synthesized event.
+
+    
+How it works: Inside each SynthesizedEvent document, there is an array called source_articles. This array stores a small copy of the key information (headline, link, newspaper) from each Article that was part of the event cluster.
+
+Database Field: SynthesizedEvent.source_articles
+
+Purpose: Display & Context. When you view an event in the dashboard or email, this allows the UI to quickly show all the source articles without needing to perform additional database lookups.
+
+  
+
+Example: The "Lakrids by Bülow" event document contains four entries in its source_articles array, one for the article from KapitalWatch, one from Børsen, etc.
+2. Opportunity to Article Link
+
+This is a precise link that tells you exactly which enriched article was the primary trigger for creating or updating an opportunity.
+
+    
+How it works: Each Opportunity document has a field named sourceArticleId. This field stores the unique _id of the Article document that the AI analyzed to generate that opportunity.
+
+Database Field: Opportunity.sourceArticleId (which is a ref to the Article collection).
+
+Purpose: Traceability & Auditing. This lets you go directly from an opportunity back to the specific piece of intelligence that generated it. You can see the full AI assessment, content, etc., for that specific article.
+
+  
+
+Example: The "Johan Bülow" opportunity document contains a sourceArticleId that points to the _id of the enriched article from KapitalWatch, as that was one of the articles processed in the event cluster.
+3. Opportunity to Event Link (The Crucial New Link)
+
+This is the new, critical connection you asked for. It directly links an opportunity to the broader synthesized event it belongs to, solving the disconnection problem.
+code Code
+
+    
+How it works: We added a new field, sourceEventId, to the Opportunity schema. When opportunities are saved, the system looks up which SynthesizedEvent their source article belongs to and stores that event's _id in this new field.
+
+Database Field: Opportunity.sourceEventId (which is a ref to the SynthesizedEvent collection).
+
+Purpose: Navigation & Holistic View. This is the bridge that connects everything. From an opportunity, you can now instantly find the parent event.
+
+  
+
+A Practical Walkthrough
+
+Let's use your example to illustrate how you would navigate this in an application:
+code Code
+
+    
+You are viewing the Opportunity for "Johan Bülow".
+
+Your application reads the opportunity.sourceEventId. With this ID, it can fetch the corresponding SynthesizedEvent document.
+
+Now you can display the event's synthesized summary ("IDG Capital Agrees to Buy Majority Stake...") and its high relevance score (95).
+
+From that same event document, you can display all the source_articles, showing that this news was corroborated by four different newspapers.
+
+If you want to see the exact AI analysis that led to the opportunity, you can use the opportunity.sourceArticleId to fetch the specific Article document and view its detailed assessment_article text.
+
+  
+
+This new structure ensures that your data is no longer siloed. Every opportunity is now directly and explicitly part of a larger, synthesized event, giving you a complete and easily navigable view of your intelligence pipeline.
+
+Please tell me to what extent you would like to change the front end app to reflect this inter linkage between Events, Articles and Opportunities. Give me the full, unabridged code modules. Be smart!

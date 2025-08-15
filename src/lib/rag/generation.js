@@ -3,7 +3,7 @@ import { getSynthesizerPrompt } from './prompts'
 import { checkGroundedness } from './validation'
 import { callGroqWithRetry } from '@/lib/groq'
 
-const SYNTHESIZER_MODEL = 'openai/gpt-oss-120b'
+const SYNTHESIZER_MODEL = 'llama3-70b-8192'
 
 function assembleContext(ragResults, wikiResults, searchResults) {
   const dbContext =

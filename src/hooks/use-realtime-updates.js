@@ -1,13 +1,10 @@
-// src/hooks/use-realtime-updates.js (version 4.0)
+// src/hooks/use-realtime-updates.js (version 4.1)
 'use client'
 
 import { useEffect, useRef } from 'react'
 import Pusher from 'pusher-js'
-import { toast } from 'sonner'
-import { Sparkles } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-// NOTE: We cannot use the Zod schema here as this is a client component.
-// NEXT_PUBLIC_ variables are directly available on the client.
+// NOTE: Toast and icon imports are no longer needed.
 
 export function useRealtimeUpdates({ channel, event, queryKey }) {
   const queryClient = useQueryClient()
@@ -43,12 +40,11 @@ export function useRealtimeUpdates({ channel, event, queryKey }) {
       pusherChannel.bind(event, (data) => {
         console.log(`Real-time event '${event}' received on channel '${channel}':`, data)
 
+        // The hook's only job is now to invalidate the query,
+        // which triggers a seamless, silent background refresh of the data.
         queryClient.invalidateQueries({ queryKey: queryKey })
 
-        toast('New Intelligence Received', {
-          description: data.headline || data.synthesized_headline,
-          icon: <Sparkles className="h-4 w-4 text-blue-400" />,
-        })
+        // REMOVED: The toast notification logic has been completely removed.
       })
 
       console.log(`Successfully subscribed to real-time channel: '${channel}'`)

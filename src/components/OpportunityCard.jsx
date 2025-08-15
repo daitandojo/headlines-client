@@ -1,7 +1,6 @@
-// src/components/OpportunityCard.jsx (version 8.5)
+// src/components/OpportunityCard.jsx (version 8.2)
 'use client'
 
-import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,11 +26,9 @@ import { SwipeToDelete } from './swipe/SwipeToDelete'
 import { cn } from '@/lib/utils'
 
 export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-
-  const handleDelete = () => {
+  const handleDelete = (e) => {
+    if (e) e.preventDefault()
     onDelete()
-    setIsDialogOpen(false) // Ensure dialog closes
   }
 
   const sourceArticle = opportunity.sourceArticleId
@@ -46,7 +43,7 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
         isPremiumOpportunity && 'card-glow impatient-wobble'
       )}
     >
-      <SwipeToDelete onDelete={onDelete}>
+      <SwipeToDelete onDelete={handleDelete}>
         <CardContent className="p-4 space-y-3 bg-slate-900/50 relative z-10">
           <div className="flex justify-between items-start gap-3">
             <div className="flex-1 space-y-1">
@@ -67,29 +64,26 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
                 </Badge>
               )}
               <TooltipProvider>
-                {/* CORRECTED: Conditionally render the button only if a valid link exists */}
-                {sourceArticle?.link && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        disabled={isDeleting}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          window.open(sourceArticle.link, '_blank')
-                        }}
-                      >
-                        <ExternalLink className="h-4 w-4 text-slate-400" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>View Source Article</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-                <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={isDeleting}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        window.open(sourceArticle?.link, '_blank')
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4 text-slate-400" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View Source Article</p>
+                  </TooltipContent>
+                </Tooltip>
+                <AlertDialog>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <AlertDialogTrigger asChild>
@@ -98,10 +92,7 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
                           size="icon"
                           className="h-8 w-8"
                           disabled={isDeleting}
-                          onClick={(e) => {
-                            e.stopPropagation() // Stop accordion toggle
-                            setIsDialogOpen(true) // Manually open dialog
-                          }}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-400" />
                         </Button>
@@ -115,8 +106,6 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will permanently delete the opportunity for{' '}
-                        <span className="font-semibold">{opportunity.reachOutTo}</span>.
                         This action cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>

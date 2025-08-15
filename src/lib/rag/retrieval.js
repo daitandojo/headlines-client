@@ -18,7 +18,7 @@ function initializeClients() {
   }
 }
 
-const ENTITY_EXTRACTOR_MODEL = 'openai/gpt-oss-120b'
+const ENTITY_EXTRACTOR_MODEL = 'llama3-70b-8192'
 const SIMILARITY_THRESHOLD = 0.38
 const ENTITY_EXTRACTOR_PROMPT_FOR_HISTORY = `You are an entity extractor. Your job is to identify all specific people and companies mentioned in a given text.
 Respond ONLY with a valid JSON object with the following structure:
