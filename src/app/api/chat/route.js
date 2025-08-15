@@ -1,4 +1,4 @@
-// src/app/api/chat/route.js (version 6.0)
+// src/app/api/chat/route.js (version 6.1)
 import { processChatRequest } from '@/lib/rag/orchestrator'
 import { logQuery, startTimer } from '@/lib/monitoring'
 
@@ -14,12 +14,11 @@ export async function POST(req) {
     queryForLogging = messages[messages.length - 1].content
 
     // Delegate all complex logic to the RAG orchestrator.
-    // This now returns a final, validated string.
-    const responseText = await processChatRequest(messages)
+    // This now returns a structured object with the answer and thoughts.
+    const response = await processChatRequest(messages)
 
-    // Return the response as a simple text payload.
-    // The `useChat` hook on the client will handle this non-streaming response.
-    return new Response(responseText)
+    // Return the response as a JSON payload.
+    return Response.json(response)
   } catch (error) {
     console.error('[CHAT API Top-Level Error]', error)
 
@@ -35,6 +34,6 @@ export async function POST(req) {
 
     const errorMessage =
       'An error occurred while processing your request. Please check the server logs for details.'
-    return new Response(errorMessage, { status: 500 })
+    return new Response(JSON.stringify({ error: errorMessage }), { status: 500 })
   }
 }

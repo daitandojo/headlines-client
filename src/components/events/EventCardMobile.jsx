@@ -1,4 +1,4 @@
-// src/components/events/EventCardMobile.jsx (version 1.0)
+// src/components/events/EventCardMobile.jsx (version 1.1)
 'use client'
 
 import { Badge } from '@/components/ui/badge'
@@ -66,7 +66,10 @@ export function EventCardMobile({ event, onChat, onDelete, isPending }) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will permanently delete the event.
+                  This will permanently delete the event:{' '}
+                  <span className="font-semibold italic">
+                    "{event.synthesized_headline}"
+                  </span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

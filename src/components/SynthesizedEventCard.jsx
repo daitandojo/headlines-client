@@ -1,4 +1,4 @@
-// src/components/SynthesizedEventCard.jsx (version 7.1)
+// src/components/SynthesizedEventCard.jsx (version 7.3)
 'use client'
 
 import { useTransition } from 'react'
@@ -14,8 +14,6 @@ import { SwipeToDelete } from './swipe/SwipeToDelete'
 import { EventCardDesktop } from './events/EventCardDesktop'
 import { EventCardMobile } from './events/EventCardMobile'
 import { EventCardDetails } from './events/EventCardDetails'
-import { InteractiveCard } from './InteractiveCard'
-import { cn } from '@/lib/utils'
 
 export const SynthesizedEventCard = ({ event, onDelete }) => {
   const [isPending, startTransition] = useTransition()
@@ -35,13 +33,11 @@ export const SynthesizedEventCard = ({ event, onDelete }) => {
     router.push('/chat')
   }
 
-  const isHighRelevance = event.highest_relevance_score > 69
-
   return (
-    <InteractiveCard className={cn(isHighRelevance && 'card-glow impatient-wobble')}>
+    <div className="relative w-full">
       <AccordionItem
         value={event.event_key}
-        className={`relative border-none rounded-xl overflow-hidden transition-all duration-300 hover:-translate-y-0 ${isPending ? 'opacity-50' : ''}`}
+        className={`relative border-none rounded-xl overflow-hidden transition-all duration-300 ${isPending ? 'opacity-50' : ''}`}
       >
         <SwipeToDelete onDelete={handleDelete}>
           <div className="p-4 bg-transparent relative z-10">
@@ -70,6 +66,6 @@ export const SynthesizedEventCard = ({ event, onDelete }) => {
           <EventCardDetails event={event} />
         </AccordionContent>
       </AccordionItem>
-    </InteractiveCard>
+    </div>
   )
 }

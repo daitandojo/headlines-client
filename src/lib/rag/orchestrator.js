@@ -1,5 +1,6 @@
-// src/lib/rag/orchestrator.js (version 4.1)
+// src/lib/rag/orchestrator.js (version 4.2)
 import { retrieveContextForQuery } from './retrieval'
+import { assessContextQuality } from './validation'
 import { generateFinalResponse } from './generation'
 import { runPlannerAgent } from './planner'
 
@@ -16,20 +17,30 @@ export async function processChatRequest(messages) {
   const plan = await runPlannerAgent(messages)
   console.log('[RAG Pipeline] Step 1: Planning Phase Completed.')
 
-  // 2. Retrieval Phase
+  // 2. Retrieval & Validation Phase
   console.log('[RAG Pipeline] Step 2: Retrieval Phase Started...')
-  // CORRECTED: Pass the entire 'plan' object, not just the search_queries.
-  const context = await retrieveContextForQuery(plan, messages)
+  const initialContext = await retrieveContextForQuery(plan, messages, 'ragOnly')
+  const initialQuality = assessContextQuality(initialContext.ragResults, [], [])
+
+  let finalContext = initialContext
+
+  if (initialQuality.hasHighConfidenceRAG) {
+    console.log('[RAG Pipeline] High confidence RAG hit. Short-circuiting retrieval.')
+  } else {
+    console.log('[RAG Pipeline] RAG context insufficient. Proceeding to full retrieval.')
+    // Perform the remaining retrieval steps
+    finalContext = await retrieveContextForQuery(plan, messages, 'full')
+  }
   console.log('[RAG Pipeline] Step 2: Retrieval Phase Completed.')
 
   // 3. Synthesis Phase
   console.log('[RAG Pipeline] Step 3: Synthesis Phase Started...')
-  const finalResponseText = await generateFinalResponse({
+  const finalResponse = await generateFinalResponse({
     plan,
-    context,
+    context: finalContext,
   })
   console.log('[RAG Pipeline] Step 3: Synthesis Phase Completed.')
 
   console.log('--- [RAG Pipeline End] ---')
-  return finalResponseText
+  return finalResponse
 }

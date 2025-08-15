@@ -1,4 +1,4 @@
-// src/components/events/EventCardDesktop.jsx (version 1.0)
+// src/components/events/EventCardDesktop.jsx (version 1.1)
 'use client'
 
 import { Badge } from '@/components/ui/badge'
@@ -89,7 +89,10 @@ export function EventCardDesktop({ event, onChat, onDelete, isPending }) {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete the synthesized event.
+                    This will permanently delete the event:{' '}
+                    <span className="font-semibold italic">
+                      "{event.synthesized_headline}"
+                    </span>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

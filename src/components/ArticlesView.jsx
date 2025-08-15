@@ -1,4 +1,4 @@
-// src/components/ArticlesView.jsx (version 5.3)
+// src/components/ArticlesView.jsx (version 5.4)
 'use client'
 
 import { useMemo } from 'react'
@@ -55,9 +55,8 @@ export function ArticlesView({ initialArticles, searchParams }) {
       }
       toast.error('Failed to delete article. Restoring.')
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey })
-    },
+    // REMOVED onSettled to prevent list re-ordering and PWA instability.
+    // The query will naturally refetch when it becomes stale.
   })
 
   useRealtimeUpdates({

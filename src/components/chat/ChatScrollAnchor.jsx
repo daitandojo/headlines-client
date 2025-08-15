@@ -1,18 +1,20 @@
-"use client";
+// src/components/chat/ChatScrollAnchor.jsx (version 1.1)
+'use client'
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, forwardRef } from 'react'
 
-export function ChatScrollAnchor({ messages }) {
-  const scrollAnchorRef = useRef(null);
+export const ChatScrollAnchor = forwardRef(function ChatScrollAnchor({ messages }, ref) {
+  const internalRef = useRef(null)
+  const anchorRef = ref || internalRef
 
   useEffect(() => {
-    if (scrollAnchorRef.current) {
-        scrollAnchorRef.current.scrollIntoView({
-            block: "start",
-            behavior: "smooth",
-      });
+    if (anchorRef.current) {
+      anchorRef.current.scrollIntoView({
+        block: 'start',
+        behavior: 'smooth',
+      })
     }
-  }, [messages]); // Trigger scroll whenever messages array changes
+  }, [messages, anchorRef])
 
-  return <div ref={scrollAnchorRef} className="h-px w-full" />;
-}
+  return <div ref={anchorRef} className="h-px w-full" />
+})

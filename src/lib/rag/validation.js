@@ -6,7 +6,7 @@ import { GROUNDEDNESS_CHECK_PROMPT } from './prompts'
 // --- Constants ---
 const HIGH_CONFIDENCE_THRESHOLD = 0.75
 const SIMILARITY_THRESHOLD = 0.38
-const GROUNDEDNESS_MODEL = 'llama3-8b-8192'
+const GROUNDEDNESS_MODEL = 'openai/gpt-oss-120b'
 
 let groq
 function getGroqClient() {

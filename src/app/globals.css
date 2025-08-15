@@ -125,20 +125,6 @@
     color: #fde68a;
   }
 
-  /* --- Masked Gradient for Hover Shine Effect --- */
-  .masked-gradient {
-    -webkit-mask-image: radial-gradient(
-      200px 200px at var(--x, 0) var(--y, 0),
-      #000,
-      transparent
-    );
-    mask-image: radial-gradient(
-      200px 200px at var(--x, 0) var(--y, 0),
-      #000,
-      transparent
-    );
-  }
-
   /* --- Golden Glowing Border for High-Relevance Cards --- */
   .card-glow {
     position: relative;

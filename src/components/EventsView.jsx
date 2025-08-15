@@ -1,4 +1,4 @@
-// src/components/EventsView.jsx (version 1.3)
+// src/components/EventsView.jsx (version 1.4)
 'use client'
 
 import { useMemo } from 'react'
@@ -55,9 +55,7 @@ export function EventsView({ initialEvents, searchParams }) {
       }
       toast.error('Failed to delete event. Restoring.')
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey })
-    },
+    // REMOVED onSettled to prevent list re-ordering and PWA instability.
   })
 
   useRealtimeUpdates({

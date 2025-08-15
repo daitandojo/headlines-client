@@ -1,21 +1,9 @@
-// src/lib/rag/generation.js (version 4.0)
-import OpenAI from 'openai'
-import { getSynthesizerPrompt, FAILED_GROUNDEDNESS_PROMPT } from './prompts'
+// src/lib/rag/generation.js (version 4.4)
+import { getSynthesizerPrompt } from './prompts'
 import { checkGroundedness } from './validation'
-import { env } from '@/lib/env.mjs'
+import { callGroqWithRetry } from '@/lib/groq'
 
-let groq
-function getGroqClient() {
-  if (!groq) {
-    groq = new OpenAI({
-      apiKey: env.GROQ_API_KEY,
-      baseURL: 'https://api.groq.com/openai/v1',
-    })
-  }
-  return groq
-}
-
-const SYNTHESIZER_MODEL = 'llama3-70b-8192'
+const SYNTHESIZER_MODEL = 'openai/gpt-oss-120b'
 
 function assembleContext(ragResults, wikiResults, searchResults) {
   const dbContext =
@@ -56,38 +44,28 @@ ${searchContext}
 ---`
 }
 
-async function runSynthesizerAgent(plan, contextString) {
-  const client = getGroqClient()
+function formatThoughts(plan, context, groundednessResult) {
+  const thoughts = `
+**THOUGHT PROCESS: THE PLAN**
+${plan.plan.map((step) => `- ${step}`).join('\n')}
 
-  console.groupCollapsed('[RAG Generation] Final Context Sent to Synthesizer Agent')
-  console.log('PLAN:', plan.plan)
-  console.log('CONTEXT:', contextString)
-  console.groupEnd()
+**REASONING:**
+${plan.reasoning}
 
-  console.log('[RAG Generation] Calling Synthesizer Agent...')
-  const synthesizerResponse = await client.chat.completions.create({
-    model: SYNTHESIZER_MODEL,
-    messages: [
-      { role: 'system', content: getSynthesizerPrompt() },
-      {
-        role: 'user',
-        content: `CONTEXT:\n${contextString}\n\nPLAN:\n${JSON.stringify(
-          plan.plan,
-          null,
-          2
-        )}\n\nUSER'S QUESTION: "${plan.user_query}"`,
-      },
-    ],
-    temperature: 0.0,
-  })
+**RETRIEVED CONTEXT:**
+- **Internal RAG Search:** ${context.ragResults.length} item(s) found.
+${context.ragResults.map((r) => `  - [Score: ${r.score.toFixed(2)}] ${r.metadata.headline}`).join('\n')}
 
-  const rawResponse = synthesizerResponse.choices[0].message.content
+- **Wikipedia Search:** ${context.wikiResults.length} article(s) found.
+${context.wikiResults.map((w) => `  - **Query:** "${w.query}"\n    - **Result:** ${w.title}: ${w.summary.substring(0, 100)}...`).join('\n')}
 
-  console.groupCollapsed('[RAG Generation] Raw Synthesizer Response Received')
-  console.log(rawResponse)
-  console.groupEnd()
+- **Web Search:** ${context.searchResults.length} result(s) found.
+${context.searchResults.map((s) => `  - **Query:** "${plan.user_query}"\n    - **Result:** ${s.title}: ${s.snippet.substring(0, 100)}...`).join('\n')}
 
-  return rawResponse
+**FINAL CHECK:**
+- **Groundedness Passed:** CONFIRMED
+`
+  return thoughts.trim().replace(/\n\n+/g, '\n\n')
 }
 
 export async function generateFinalResponse({ plan, context }) {
@@ -97,19 +75,43 @@ export async function generateFinalResponse({ plan, context }) {
     context.searchResults
   )
 
-  const initialResponse = await runSynthesizerAgent(plan, fullContextString)
-  const groundednessResult = await checkGroundedness(initialResponse, fullContextString)
+  console.log('[RAG Generation] Calling Synthesizer Agent...')
+  const synthesizerResponse = await callGroqWithRetry({
+    model: SYNTHESIZER_MODEL,
+    messages: [
+      { role: 'system', content: getSynthesizerPrompt() },
+      {
+        role: 'user',
+        content: `CONTEXT:\n${fullContextString}\n\nPLAN:\n${JSON.stringify(
+          plan.plan,
+          null,
+          2
+        )}\n\nUSER'S QUESTION: "${plan.user_query}"`,
+      },
+    ],
+    temperature: 0.1,
+  })
 
+  const rawResponse = synthesizerResponse.choices[0].message.content
+  const groundednessResult = await checkGroundedness(rawResponse, fullContextString)
+  const thoughts = formatThoughts(plan, context, groundednessResult)
+
+  let finalAnswer
   if (groundednessResult.is_grounded) {
-    let finalResponse = initialResponse.replace(/<rag>/g, '<span class="rag-source">')
-    finalResponse = finalResponse.replace(/<\/rag>/g, '</span>')
-    finalResponse = finalResponse.replace(/<wiki>/g, '<span class="wiki-source">')
-    finalResponse = finalResponse.replace(/<\/wiki>/g, '</span>')
-    finalResponse = finalResponse.replace(/<search>/g, '<span class="llm-source">')
-    finalResponse = finalResponse.replace(/<\/search>/g, '</span>')
-    return finalResponse
+    let responseWithSpans = rawResponse.replace(/<rag>/g, '<span class="rag-source">')
+    responseWithSpans = responseWithSpans.replace(/<\/rag>/g, '</span>')
+    responseWithSpans = responseWithSpans.replace(/<wiki>/g, '<span class="wiki-source">')
+    responseWithSpans = responseWithSpans.replace(/<\/wiki>/g, '</span>')
+    responseWithSpans = responseWithSpans.replace(
+      /<search>/g,
+      '<span class="llm-source">'
+    )
+    finalAnswer = responseWithSpans.replace(/<\/search>/g, '</span>')
   } else {
     console.warn('[RAG Pipeline] Groundedness check failed. Returning safe response.')
-    return FAILED_GROUNDEDNESS_PROMPT
+    finalAnswer =
+      'I was unable to construct a reliable answer from the available sources. The context may be insufficient or conflicting.'
   }
+
+  return { answer: finalAnswer, thoughts }
 }

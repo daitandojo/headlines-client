@@ -1,4 +1,4 @@
-// src/components/OpportunitiesView.jsx (version 12.0)
+// src/components/OpportunitiesView.jsx (version 12.1)
 'use client'
 
 import { useMemo } from 'react'
@@ -74,9 +74,7 @@ export function OpportunitiesView({
       }
       toast.error('Failed to delete opportunity. Restoring.')
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey })
-    },
+    // REMOVED onSettled to prevent list re-ordering and PWA instability.
   })
 
   const handleCountryChange = (value) => {

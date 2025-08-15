@@ -1,4 +1,4 @@
-// src/components/GlobalFilters.jsx (version 2.0)
+// src/components/GlobalFilters.jsx (version 2.1)
 'use client'
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -61,8 +61,8 @@ export function GlobalFilters({ uniqueCountries }) {
   const hasActiveFilters = filters.q || filters.country
 
   return (
-    <Card className="mb-8 bg-black/20 backdrop-blur-sm border-white/10 shadow-xl shadow-black/40">
-      <CardContent className="p-4 md:p-6">
+    <Card className="mb-8 bg-black/20 backdrop-blur-sm border-white/10 shadow-xl shadow-black/40 py-0">
+      <CardContent className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-4 items-end">
           {/* --- Search Input (takes more space on desktop) --- */}
           <div className="space-y-1.5 md:col-span-2 lg:col-span-2">

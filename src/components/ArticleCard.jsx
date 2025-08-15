@@ -1,4 +1,4 @@
-// src/components/ArticleCard.jsx (version 7.1)
+// src/components/ArticleCard.jsx (version 7.4)
 'use client'
 
 import { useTransition } from 'react'
@@ -29,8 +29,6 @@ import {
 import { Trash2, ExternalLink, Users, Mail, Building, Briefcase } from 'lucide-react'
 import { getCountryFlag } from '@/lib/countries'
 import { SwipeToDelete } from './swipe/SwipeToDelete'
-import { InteractiveCard } from './InteractiveCard'
-import { cn } from '@/lib/utils'
 
 const getRelevanceBadgeClass = (score) => {
   if (score >= 90)
@@ -51,10 +49,9 @@ export const ArticleCard = ({ article, onDelete }) => {
 
   const flag = getCountryFlag(article.country)
   const relevanceScore = article.relevance_article || article.relevance_headline
-  const isHighRelevance = relevanceScore > 69
 
   return (
-    <InteractiveCard className={cn(isHighRelevance && 'card-glow impatient-wobble')}>
+    <div className="relative w-full">
       <AccordionItem
         value={article._id}
         className={`border-none overflow-hidden rounded-xl ${isPending ? 'opacity-50' : ''}`}
@@ -110,7 +107,10 @@ export const ArticleCard = ({ article, onDelete }) => {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will permanently delete the article from the database.
+                          This will permanently delete the article:{' '}
+                          <span className="font-semibold italic">
+                            "{article.headline_en || article.headline}"
+                          </span>
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -186,6 +186,6 @@ export const ArticleCard = ({ article, onDelete }) => {
           </div>
         </AccordionContent>
       </AccordionItem>
-    </InteractiveCard>
+    </div>
   )
 }

@@ -1,4 +1,4 @@
-// src/lib/rag/retrieval.js (version 5.0)
+// src/lib/rag/retrieval.js (version 5.1)
 import OpenAI from 'openai'
 import { Pinecone } from '@pinecone-database/pinecone'
 import { generateQueryEmbeddings } from '@/lib/embeddings'
@@ -18,14 +18,13 @@ function initializeClients() {
   }
 }
 
-const ENTITY_EXTRACTOR_MODEL = 'llama3-70b-8192'
+const ENTITY_EXTRACTOR_MODEL = 'openai/gpt-oss-120b'
 const SIMILARITY_THRESHOLD = 0.38
 const ENTITY_EXTRACTOR_PROMPT_FOR_HISTORY = `You are an entity extractor. Your job is to identify all specific people and companies mentioned in a given text.
 Respond ONLY with a valid JSON object with the following structure:
 { "entities": ["Entity Name 1", "Entity Name 2"] }
 `
 
-// This function is still useful for excluding entities mentioned in recent history.
 async function extractEntitiesFromHistory(messages) {
   if (messages.length < 2) {
     return []
@@ -65,7 +64,6 @@ async function extractEntitiesFromHistory(messages) {
   }
 }
 
-// Refactored to accept an array of queries directly from the planner.
 async function fetchPineconeContext(queries, exclude_entities = []) {
   initializeClients()
   const queryEmbeddings = await Promise.all(
@@ -84,7 +82,7 @@ async function fetchPineconeContext(queries, exclude_entities = []) {
 
   const pineconePromises = allQueryEmbeddings.map((embedding) =>
     pineconeIndex.query({
-      topK: 3,
+      topK: 5,
       vector: embedding,
       includeMetadata: true,
       filter: filter,
@@ -139,18 +137,21 @@ async function fetchValidatedWikipediaContext(entities) {
   return validWikiResults
 }
 
-/**
- * Retrieves context from all sources based on the planner's output.
- * @param {object} plan - The plan object from the planner agent.
- * @param {Array<object>} messages - The full chat history.
- * @returns {Promise<object>} An object containing results from all retrieval sources.
- */
-export async function retrieveContextForQuery(plan, messages) {
+export async function retrieveContextForQuery(plan, messages, mode = 'full') {
   const { search_queries, user_query } = plan
   const entitiesToExclude = await extractEntitiesFromHistory(messages)
 
-  const [pineconeResults, wikipediaResults, searchResultsObj] = await Promise.all([
-    fetchPineconeContext(search_queries, entitiesToExclude),
+  const pineconeResults = await fetchPineconeContext(search_queries, entitiesToExclude)
+
+  if (mode === 'ragOnly') {
+    return {
+      ragResults: pineconeResults,
+      wikiResults: [],
+      searchResults: [],
+    }
+  }
+
+  const [wikipediaResults, searchResultsObj] = await Promise.all([
     fetchValidatedWikipediaContext(search_queries),
     getGoogleSearchResults(user_query),
   ])
