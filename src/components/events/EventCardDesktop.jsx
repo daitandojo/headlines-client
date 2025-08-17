@@ -1,4 +1,4 @@
-// src/components/events/EventCardDesktop.jsx (version 1.1)
+// src/components/events/EventCardDesktop.jsx (version 1.2)
 'use client'
 
 import { Badge } from '@/components/ui/badge'
@@ -9,19 +9,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import { Trash2, MessageSquarePlus, Users } from 'lucide-react'
 import { getCountryFlag } from '@/lib/countries'
+import Image from 'next/image'
 
 const getRelevanceBadgeClass = (score) => {
   if (score >= 90)
@@ -34,6 +24,7 @@ const getRelevanceBadgeClass = (score) => {
 export function EventCardDesktop({ event, onChat, onDelete, isPending }) {
   if (!event) return null
   const flag = getCountryFlag(event.country)
+  const primaryImageUrl = event.source_articles?.find((a) => a.imageUrl)?.imageUrl
 
   return (
     <div className="hidden sm:block">
@@ -41,7 +32,9 @@ export function EventCardDesktop({ event, onChat, onDelete, isPending }) {
         <div className="flex items-start gap-6">
           <div className="flex flex-col items-center shrink-0">
             <Badge
-              className={`text-xl font-bold px-4 py-2 ${getRelevanceBadgeClass(event.highest_relevance_score)}`}
+              className={`text-xl font-bold px-4 py-2 ${getRelevanceBadgeClass(
+                event.highest_relevance_score
+              )}`}
             >
               {event.highest_relevance_score}
             </Badge>
@@ -54,6 +47,17 @@ export function EventCardDesktop({ event, onChat, onDelete, isPending }) {
             </h3>
             <p className="text-slate-300 leading-relaxed">{event.synthesized_summary}</p>
           </div>
+          {primaryImageUrl && (
+            <div className="relative h-24 w-24 rounded-lg overflow-hidden flex-shrink-0">
+              <Image
+                src={primaryImageUrl}
+                alt={event.synthesized_headline}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              />
+            </div>
+          )}
           <div className="absolute top-4 right-4 z-10 flex gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -61,46 +65,27 @@ export function EventCardDesktop({ event, onChat, onDelete, isPending }) {
                   variant="ghost"
                   size="icon"
                   onClick={onChat}
-                  className="text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 h-8 w-8"
+                  className="text-slate-400 hover:text-blue-400 bg-black/20 hover:bg-blue-500/20 h-8 w-8"
                 >
                   <MessageSquarePlus className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Ask AI about this event</TooltipContent>
             </Tooltip>
-            <AlertDialog>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={isPending}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>Delete Event</TooltipContent>
-              </Tooltip>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete the event:{' '}
-                    <span className="font-semibold italic">
-                      "{event.synthesized_headline}"
-                    </span>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={onDelete}>Continue</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={isPending}
+                  onClick={onDelete}
+                  className="text-slate-400 hover:text-red-400 bg-black/20 hover:bg-red-500/20 h-8 w-8"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete Event</TooltipContent>
+            </Tooltip>
           </div>
         </div>
         <div className="mt-4 pt-4 border-t border-slate-800/50 flex flex-col sm:flex-row justify-between items-start gap-4">

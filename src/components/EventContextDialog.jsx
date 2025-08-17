@@ -1,4 +1,4 @@
-// src/components/EventContextDialog.jsx (version 1.0)
+// src/components/EventContextDialog.jsx (version 1.1)
 'use client'
 
 import {

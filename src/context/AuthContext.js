@@ -1,18 +1,20 @@
-// src/context/AuthContext.jsx (version 1.1)
+// src/context/AuthContext.jsx (version 1.2)
 'use client'
 
-import { createContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { LoadingOverlay } from '@/components/LoadingOverlay'
 import { updateUserProfile } from '@/actions/subscriber'
 
 const AuthContext = createContext(null)
+const PROFILE_UPDATE_CHANNEL = 'user_profile_updated'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const broadcastChannelRef = useRef(null)
 
   const fetchUser = useCallback(async () => {
     console.log('[AuthContext] Attempting to fetch user profile...')
@@ -37,6 +39,25 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     fetchUser()
+
+    // Initialize BroadcastChannel
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel(PROFILE_UPDATE_CHANNEL)
+      bc.onmessage = (event) => {
+        if (event.data.type === 'USER_PROFILE_UPDATED') {
+          console.log(
+            '[Broadcast] Received profile update from another tab. Refetching user.'
+          )
+          toast.info('Your preferences have been updated in this tab.')
+          fetchUser()
+        }
+      }
+      broadcastChannelRef.current = bc
+
+      return () => {
+        bc.close()
+      }
+    }
   }, [fetchUser])
 
   const login = async (email, password) => {
@@ -76,18 +97,17 @@ export function AuthProvider({ children }) {
     if (!user) return
 
     const previousUser = { ...user }
-    // Optimistic UI update
     setUser((currentUser) => ({ ...currentUser, ...updateData }))
 
     const result = await updateUserProfile({ userId: user._id, updateData })
 
     if (result.success) {
       toast.success('Preferences updated.')
-      // Update user state with the definitive data from the server
       setUser(result.user)
+      // Broadcast the update to other tabs
+      broadcastChannelRef.current?.postMessage({ type: 'USER_PROFILE_UPDATED' })
     } else {
       toast.error('Failed to update preferences. Reverting.')
-      // Revert on failure
       setUser(previousUser)
     }
   }

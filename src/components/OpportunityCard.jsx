@@ -1,4 +1,4 @@
-// src/components/OpportunityCard.jsx (version 10.0)
+// src/components/OpportunityCard.jsx (version 11.2)
 'use client'
 
 import { useState } from 'react'
@@ -10,20 +10,29 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { ExternalLink, User, Briefcase, MapPin, Trash2, Mail, Zap } from 'lucide-react'
+import {
+  ExternalLink,
+  User,
+  Briefcase,
+  MapPin,
+  Trash2,
+  Mail,
+  Zap,
+  MessageSquare,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { SwipeToDelete } from './swipe/SwipeToDelete'
 import { cn } from '@/lib/utils'
 import { EventContextDialog } from './EventContextDialog'
-import { DeletionConfirmationDialog } from './DeletionConfirmationDialog' // <-- Import new dialog
-import useAppStore from '@/store/use-app-store' // <-- Import store
+import { DeletionConfirmationDialog } from './DeletionConfirmationDialog'
+import useAppStore from '@/store/use-app-store'
 
 export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false) // <-- State for delete dialog
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const skipConfirmation = useAppStore(
     (state) => state.deletePreferences.skipOpportunityConfirmation
-  ) // <-- Get preference from store
+  )
 
   const handleDelete = (e) => {
     if (e) e.preventDefault()
@@ -44,6 +53,10 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
   const { contactDetails } = opportunity
   const isPremiumOpportunity = opportunity.likelyMMDollarWealth > 49
 
+  const reasonsToContact = Array.isArray(opportunity.whyContact)
+    ? opportunity.whyContact
+    : [opportunity.whyContact]
+
   return (
     <>
       <Card
@@ -55,7 +68,6 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
       >
         <SwipeToDelete onDelete={handleDelete}>
           <CardContent className="p-4 space-y-3 bg-slate-900/50 relative z-10">
-            {/* Header section with name and actions */}
             <div className="flex justify-between items-start gap-3">
               <div className="flex-1 space-y-1">
                 <p className="font-bold text-base text-slate-100 flex items-center gap-2">
@@ -81,7 +93,7 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        disabled={isDeleting}
+                        disabled={isDeleting || !sourceArticle?.link}
                         onClick={(e) => {
                           e.stopPropagation()
                           window.open(sourceArticle?.link, '_blank')
@@ -114,8 +126,7 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
               </div>
             </div>
 
-            {/* Main content with contact details and reason */}
-            <div className="pl-4 border-l-2 border-slate-700 space-y-2">
+            <div className="pl-4 border-l-2 border-slate-700 space-y-3">
               <div className="text-sm text-slate-400 space-y-1">
                 {contactDetails?.role && contactDetails?.company && (
                   <p className="flex items-center gap-2">
@@ -135,12 +146,19 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
                   </a>
                 )}
               </div>
-              <p className="text-sm text-slate-300 pt-1 italic">
-                “{opportunity.whyContact}”
-              </p>
+              <div className="space-y-2">
+                {reasonsToContact.map((reason, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-2 text-sm text-slate-300 italic"
+                  >
+                    <MessageSquare className="h-4 w-4 mt-0.5 text-slate-500 flex-shrink-0" />
+                    <p>“{reason}”</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Event context section */}
             {sourceEvent && (
               <div className="pt-3 mt-3 border-t border-slate-700/50">
                 <Button
@@ -150,7 +168,7 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
                 >
                   <Zap className="h-4 w-4 mr-3 text-blue-400 flex-shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-xs text-slate-400">Part of Event:</p>
+                    <p className="text-xs text-slate-400">View Parent Event:</p>
                     <p className="text-sm font-semibold text-slate-200 truncate">
                       {sourceEvent.synthesized_headline}
                     </p>
@@ -162,7 +180,6 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
         </SwipeToDelete>
       </Card>
 
-      {/* RENDER THE DIALOGS */}
       {sourceEvent && (
         <EventContextDialog
           event={sourceEvent}

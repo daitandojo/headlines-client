@@ -1,10 +1,11 @@
-// src/actions/articles.js (version 4.0)
+// src/actions/articles.js (version 4.1)
 'use server'
 
 import dbConnect from '@/lib/mongodb'
 import Article from '@/models/Article'
 import { revalidatePath } from 'next/cache'
 import { ARTICLES_PER_PAGE } from '@/config/constants'
+import { buildQuery } from '@/lib/queryBuilder'
 
 export async function deleteArticle(articleId) {
   if (!articleId) {
@@ -27,36 +28,13 @@ export async function deleteArticle(articleId) {
   }
 }
 
+const baseQuery = {
+  $or: [{ relevance_article: { $gt: 25 } }, { relevance_headline: { $gt: 25 } }],
+}
+
 export async function getArticles({ page = 1, filters = {}, sort = 'date_desc' }) {
   await dbConnect()
-
-  const andConditions = [
-    { $or: [{ relevance_article: { $gt: 25 } }, { relevance_headline: { $gt: 25 } }] },
-  ]
-
-  if (filters.q) {
-    const searchRegex = { $regex: filters.q, $options: 'i' }
-    andConditions.push({
-      $or: [
-        { headline: searchRegex },
-        { headline_en: searchRegex },
-        { assessment_article: searchRegex },
-        { 'key_individuals.name': searchRegex },
-      ],
-    })
-  }
-  if (filters.country && filters.country.length > 0) {
-    andConditions.push({ country: { $in: filters.country } })
-  }
-
-  const queryFilter =
-    andConditions.length > 1 ? { $and: andConditions } : andConditions[0] || {}
-
-  const sortOptions = {}
-  if (sort === 'date_asc') sortOptions.createdAt = 1
-  else if (sort === 'relevance_desc') sortOptions.relevance_article = -1
-  else sortOptions.createdAt = -1
-
+  const { queryFilter, sortOptions } = buildQuery(Article, { filters, sort, baseQuery })
   const skipAmount = (page - 1) * ARTICLES_PER_PAGE
 
   const articles = await Article.find(queryFilter)
@@ -68,34 +46,9 @@ export async function getArticles({ page = 1, filters = {}, sort = 'date_desc' }
   return JSON.parse(JSON.stringify(articles))
 }
 
-/**
- * Gets the total count of relevant articles, optionally filtered.
- * @returns {Promise<number>} The total number of relevant articles.
- */
 export async function getTotalArticleCount({ filters = {} } = {}) {
   await dbConnect()
-
-  const andConditions = [
-    { $or: [{ relevance_article: { $gt: 25 } }, { relevance_headline: { $gt: 25 } }] },
-  ]
-
-  if (filters.q) {
-    const searchRegex = { $regex: filters.q, $options: 'i' }
-    andConditions.push({
-      $or: [
-        { headline: searchRegex },
-        { headline_en: searchRegex },
-        { assessment_article: searchRegex },
-        { 'key_individuals.name': searchRegex },
-      ],
-    })
-  }
-  if (filters.country && filters.country.length > 0) {
-    andConditions.push({ country: { $in: filters.country } })
-  }
-
-  const queryFilter =
-    andConditions.length > 1 ? { $and: andConditions } : andConditions[0] || {}
+  const { queryFilter } = buildQuery(Article, { filters, baseQuery })
   const count = await Article.countDocuments(queryFilter)
   return count
 }

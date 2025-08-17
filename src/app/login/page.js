@@ -1,4 +1,4 @@
-// src/app/login/page.js (version 6.0)
+// src/app/login/page.js (version 6.1)
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -22,27 +22,23 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const { user, login, isLoading } = useAuth()
-  const [isError, setIsError] = useState(false)
+  const [isError, setIsError] = useState(false) // This can be used for UI feedback if login hook provides error state
   const router = useRouter()
 
-  // START: ADDED REDIRECT LOGIC
-  // This effect runs whenever the user's auth state changes.
-  // If a user is detected, it means they are logged in, and we must redirect them away.
   useEffect(() => {
     if (user) {
       console.log('[Login Page] User is already authenticated. Redirecting to /events.')
       router.push('/events')
     }
   }, [user, router])
-  // END: ADDED REDIRECT LOGIC
 
   const handleLogin = async (e) => {
     e.preventDefault()
     setIsError(false)
+    // The login function from useAuth now handles the API call, loading state, and error toasts.
     await login(email, password)
   }
 
-  // If the user is authenticated, we render nothing while the redirect happens.
   if (user) {
     return <LoadingOverlay isLoading={true} text="Redirecting..." />
   }

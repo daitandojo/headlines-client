@@ -1,8 +1,9 @@
-// src/hooks/use-push-manager.js (version 12.0)
+// src/hooks/use-push-manager.js (version 12.1)
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
+import { useAuth } from './useAuth' // Import useAuth to get user context
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -19,10 +20,10 @@ export function usePushManager() {
   const [isSupported, setIsSupported] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const { user } = useAuth() // Get the authenticated user
 
   const checkSubscription = useCallback(async () => {
     try {
-      // This now assumes the SW is registered by the layout and will be ready.
       const registration = await navigator.serviceWorker.ready
       const subscription = await registration.pushManager.getSubscription()
       setIsSubscribed(!!subscription)
@@ -41,10 +42,8 @@ export function usePushManager() {
       'PushManager' in window
     ) {
       setIsSupported(true)
-
-      // The SW is registered in layout.js. We just wait for it to be ready.
       navigator.serviceWorker.ready
-        .then((registration) => {
+        .then(() => {
           console.log('[PushManager] Service Worker is ready, checking subscription.')
           checkSubscription().finally(() => setIsLoading(false))
         })
@@ -58,6 +57,10 @@ export function usePushManager() {
   }, [checkSubscription])
 
   const subscribe = useCallback(async () => {
+    if (!user) {
+      toast.error('You must be logged in to subscribe to notifications.')
+      return
+    }
     if (isSubscribed) {
       toast.info('You are already subscribed to notifications.')
       return
@@ -66,7 +69,6 @@ export function usePushManager() {
     setIsLoading(true)
     try {
       const registration = await navigator.serviceWorker.ready
-
       if (Notification.permission === 'denied') {
         throw new Error('Notification permission has been denied by the user.')
       }
@@ -81,6 +83,7 @@ export function usePushManager() {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       })
 
+      // Send the subscription AND the user ID to the server
       await fetch('/api/push/subscribe', {
         method: 'POST',
         body: JSON.stringify(subscription),
@@ -99,7 +102,7 @@ export function usePushManager() {
     } finally {
       setIsLoading(false)
     }
-  }, [isSubscribed])
+  }, [isSubscribed, user])
 
   return { isSupported, isSubscribed, isLoading, subscribe }
 }

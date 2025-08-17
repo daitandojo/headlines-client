@@ -1,4 +1,4 @@
-// src/models/Opportunity.js (version 3.1)
+// src/models/Opportunity.js (version 3.2)
 import mongoose from 'mongoose'
 
 const { Schema, model, models } = mongoose
@@ -17,7 +17,7 @@ const OpportunitySchema = new Schema(
     reachOutTo: { type: String, required: true, trim: true },
     contactDetails: { type: ContactDetailsSchema },
     basedIn: { type: String, trim: true },
-    whyContact: { type: String, required: true, trim: true },
+    whyContact: { type: [String], required: true }, // CORRECTED
     likelyMMDollarWealth: { type: Number, required: true, default: 0 },
     sourceArticleId: {
       type: Schema.Types.ObjectId,
@@ -25,14 +25,12 @@ const OpportunitySchema = new Schema(
       required: true,
       index: true,
     },
-    // START: ADDED NEW LINK TO PARENT EVENT
     sourceEventId: {
       type: Schema.Types.ObjectId,
       ref: 'SynthesizedEvent',
       required: true,
       index: true,
     },
-    // END: ADDED NEW LINK TO PARENT EVENT
   },
   {
     timestamps: true,

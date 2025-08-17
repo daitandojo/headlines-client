@@ -1,33 +1,31 @@
-// src/app/(main)/layout.js (version 9.0)
+// src/app/(main)/layout.js (version 9.1)
+import { cache } from 'react'
 import { getTotalArticleCount } from '@/actions/articles'
 import { getTotalEventCount } from '@/actions/events'
 import { getTotalOpportunitiesCount } from '@/actions/opportunities'
-import { getGlobalCountries } from '@/actions/countries' // <-- Import new action
+import { getGlobalCountries } from '@/actions/countries'
 import { Providers } from '../providers'
 import { ConditionalLayout } from '@/components/ConditionalLayout'
 
-/**
- * The main layout is now responsible only for fetching global data.
- * The rendering of the UI shell is delegated to the ConditionalLayout
- * client component, which can react to the current route.
- */
-export default async function MainLayout({ children }) {
-  // Fetch all data required for the Header and global components.
-  const [articleCount, eventCount, opportunityCount, globalCountries] = await Promise.all(
-    [
-      getTotalArticleCount(),
-      getTotalEventCount(),
-      getTotalOpportunitiesCount(),
-      getGlobalCountries(), // <-- Fetch global countries
-    ]
-  )
+// Wrap the data fetching logic in a cached function
+const getLayoutData = cache(
+  async () => {
+    console.log('[Layout] Fetching global data for layout...')
+    const [articleCount, eventCount, opportunityCount, globalCountries] =
+      await Promise.all([
+        getTotalArticleCount(),
+        getTotalEventCount(),
+        getTotalOpportunitiesCount(),
+        getGlobalCountries(),
+      ])
+    return { articleCount, eventCount, opportunityCount, globalCountries }
+  },
+  ['global-layout-data'],
+  { revalidate: 60 }
+) // Revalidate every 60 seconds
 
-  const layoutProps = {
-    articleCount,
-    eventCount,
-    opportunityCount,
-    globalCountries, // <-- Pass down to client
-  }
+export default async function MainLayout({ children }) {
+  const layoutProps = await getLayoutData()
 
   return (
     <Providers>

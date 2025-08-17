@@ -1,43 +1,15 @@
-// src/actions/opportunities.js (version 10.0)
+// src/actions/opportunities.js (version 10.1)
 'use server'
 
 import dbConnect from '@/lib/mongodb'
 import Opportunity from '@/models/Opportunity'
 import { revalidatePath } from 'next/cache'
 import { OPPORTUNITIES_PER_PAGE } from '@/config/constants'
+import { buildQuery } from '@/lib/queryBuilder'
 
 export async function getOpportunities({ page = 1, filters = {}, sort = 'date_desc' }) {
   await dbConnect()
-
-  const andConditions = []
-
-  if (filters.country && filters.country.length > 0) {
-    const regex = filters.country.map((c) => `^${c}`).join('|')
-    andConditions.push({ basedIn: { $regex: new RegExp(regex, 'i') } })
-  }
-
-  // START: ADDED TEXT SEARCH LOGIC
-  if (filters.q) {
-    const searchRegex = { $regex: filters.q, $options: 'i' }
-    andConditions.push({
-      $or: [
-        { reachOutTo: searchRegex },
-        { 'contactDetails.company': searchRegex },
-        { whyContact: searchRegex },
-      ],
-    })
-  }
-  // END: ADDED TEXT SEARCH LOGIC
-
-  const queryFilter = andConditions.length > 0 ? { $and: andConditions } : {}
-
-  const sortOptions = {}
-  if (sort === 'size_desc') {
-    sortOptions.likelyMMDollarWealth = -1
-  } else {
-    sortOptions.createdAt = -1
-  }
-
+  const { queryFilter, sortOptions } = buildQuery(Opportunity, { filters, sort })
   const skipAmount = (page - 1) * OPPORTUNITIES_PER_PAGE
 
   const opportunities = await Opportunity.find(queryFilter)
@@ -56,46 +28,9 @@ export async function getOpportunities({ page = 1, filters = {}, sort = 'date_de
 
 export async function getTotalOpportunitiesCount({ filters = {} } = {}) {
   await dbConnect()
-
-  const andConditions = []
-
-  if (filters.country && filters.country.length > 0) {
-    const regex = filters.country.map((c) => `^${c}`).join('|')
-    andConditions.push({ basedIn: { $regex: new RegExp(regex, 'i') } })
-  }
-
-  // START: ADDED TEXT SEARCH LOGIC TO COUNT
-  if (filters.q) {
-    const searchRegex = { $regex: filters.q, $options: 'i' }
-    andConditions.push({
-      $or: [
-        { reachOutTo: searchRegex },
-        { 'contactDetails.company': searchRegex },
-        { whyContact: searchRegex },
-      ],
-    })
-  }
-  // END: ADDED TEXT SEARCH LOGIC TO COUNT
-
-  const queryFilter = andConditions.length > 0 ? { $and: andConditions } : {}
+  const { queryFilter } = buildQuery(Opportunity, { filters })
   const count = await Opportunity.countDocuments(queryFilter)
   return count
-}
-
-export async function getOpportunityCountries() {
-  await dbConnect()
-  const rawCountries = await Opportunity.distinct('basedIn')
-  const cleanedCountries = new Set()
-  rawCountries
-    .filter((c) => c)
-    .forEach((rawCountry) => {
-      const countryWithoutParentheses = rawCountry.split('(')[0].trim()
-      const splitCountries = countryWithoutParentheses.split('&').map((c) => c.trim())
-      splitCountries.forEach((country) => {
-        if (country) cleanedCountries.add(country)
-      })
-    })
-  return Array.from(cleanedCountries).sort()
 }
 
 export async function deleteOpportunity(opportunityId) {

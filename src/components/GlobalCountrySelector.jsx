@@ -1,7 +1,7 @@
-// src/components/GlobalCountrySelector.jsx (version 5.0)
+// src/components/GlobalCountrySelector.jsx (version 5.1)
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -24,8 +24,8 @@ export function GlobalCountrySelector({ countries }) {
   const [selectedCountries, setSelectedCountries] = useState(user?.countries || [])
   const [isSaving, setIsSaving] = useState(false)
 
-  // Sync local state if user context changes
-  useState(() => {
+  // Sync local state if the user context changes (e.g., after initial load)
+  useEffect(() => {
     setSelectedCountries(user?.countries || [])
   }, [user?.countries])
 
@@ -47,7 +47,7 @@ export function GlobalCountrySelector({ countries }) {
     setIsSaving(true)
     await updateUserPreferences({ countries: selectedCountries })
     setIsSaving(false)
-    setOpen(false) // Close dialog on save
+    setOpen(false)
   }
 
   const renderIcon = () => {
@@ -69,7 +69,7 @@ export function GlobalCountrySelector({ countries }) {
           <DialogHeader className="p-4 border-b">
             <DialogTitle>Filter by Region</DialogTitle>
             <DialogDescription>
-              Select the countries you wish to monitor across the application.
+              Select from your subscribed countries to apply a global filter.
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center border-b px-3">
@@ -84,26 +84,30 @@ export function GlobalCountrySelector({ countries }) {
           <div className="p-2 max-h-[50vh] overflow-y-auto custom-scrollbar">
             {filteredCountries.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                {filteredCountries.map((country) => (
-                  <Button
-                    key={country.name}
-                    variant="ghost"
-                    onClick={() => handleSelect(country.name)}
-                    className="flex items-center justify-start h-auto p-2"
-                  >
-                    <Check
-                      className={cn(
-                        'mr-2 h-4 w-4',
-                        selectedCountries.includes(country.name)
-                          ? 'opacity-100 text-blue-400'
-                          : 'opacity-0'
-                      )}
-                    />
-                    <span className="mr-2">{getCountryFlag(country.name)}</span>
-                    <span className="mr-2">{country.name}</span>
-                    <span className="text-xs text-slate-500">({country.count})</span>
-                  </Button>
-                ))}
+                {filteredCountries.map((country) => {
+                  const isSubscribed = user?.countries?.includes(country.name)
+                  return (
+                    <Button
+                      key={country.name}
+                      variant="ghost"
+                      onClick={() => isSubscribed && handleSelect(country.name)}
+                      disabled={!isSubscribed}
+                      className="flex items-center justify-start h-auto p-2 data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed"
+                    >
+                      <Check
+                        className={cn(
+                          'mr-2 h-4 w-4',
+                          selectedCountries.includes(country.name)
+                            ? 'opacity-100 text-blue-400'
+                            : 'opacity-0'
+                        )}
+                      />
+                      <span className="mr-2">{getCountryFlag(country.name)}</span>
+                      <span className="mr-2">{country.name}</span>
+                      <span className="text-xs text-slate-500">({country.count})</span>
+                    </Button>
+                  )
+                })}
               </div>
             ) : (
               <p className="py-6 text-center text-sm text-slate-500">No country found.</p>

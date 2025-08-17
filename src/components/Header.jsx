@@ -1,18 +1,21 @@
-// src/components/Header.jsx (version 4.0)
+// src/components/Header.jsx (version 5.0)
 'use client'
 
-import { Briefcase, LogOut } from 'lucide-react'
+import { Briefcase, LogOut, Settings, User } from 'lucide-react'
 import { InstallPwaButton } from '@/components/InstallPwaButton'
 import { GlobalCountrySelector } from './GlobalCountrySelector'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from './ui/button'
 import { NotificationToggles } from './NotificationToggles'
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import Link from 'next/link'
 
 export const Header = ({
   articleCount,
@@ -29,18 +32,31 @@ export const Header = ({
           <>
             <GlobalCountrySelector countries={globalCountries || []} />
             <NotificationToggles />
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={logout}>
-                    <LogOut className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Log Out</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="flex items-center gap-2 rounded-full"
+                >
+                  <User className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-secondary">
+                <DropdownMenuLabel>Hi, {user.firstName}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <Link href="/settings" passHref>
+                  <DropdownMenuItem>
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuItem onClick={logout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         )}
         <InstallPwaButton />

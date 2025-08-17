@@ -1,4 +1,4 @@
-// src/middleware.js (version 2.0)
+// src/middleware.js (version 2.1)
 import { NextResponse } from 'next/server'
 import * as jose from 'jose'
 import { env } from '@/lib/env.mjs'
@@ -19,10 +19,12 @@ async function verifyToken(token) {
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl
+  const loginUrl = new URL('/login', request.url)
+
   console.log(`[Middleware] Checking path: ${pathname}`)
 
+  // Allow public paths and static assets
   const publicPaths = ['/login']
-
   if (
     publicPaths.includes(pathname) ||
     pathname.startsWith('/_next/') ||
@@ -34,19 +36,33 @@ export async function middleware(request) {
     return NextResponse.next()
   }
 
+  // Verify JWT for all protected routes
   const token = request.cookies.get(JWT_COOKIE_NAME)?.value
   const userPayload = await verifyToken(token)
 
-  if (userPayload) {
-    console.log(`[Middleware] User authenticated: ${userPayload.email}`)
-    return NextResponse.next()
+  if (!userPayload) {
+    console.log(`[Middleware] User not authenticated. Redirecting to /login.`)
+    loginUrl.searchParams.set('from', pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
-  console.log(`[Middleware] User not authenticated. Redirecting to /login.`)
-  const loginUrl = new URL('/login', request.url)
-  // Pass the intended destination for a better user experience after login
-  loginUrl.searchParams.set('from', pathname)
-  return NextResponse.redirect(loginUrl)
+  // START: ADMIN ROUTE PROTECTION
+  if (pathname.startsWith('/admin')) {
+    if (userPayload.role !== 'admin') {
+      console.warn(
+        `[Middleware] ACCESS DENIED: User ${userPayload.email} (role: ${userPayload.role}) attempted to access admin route ${pathname}. Redirecting.`
+      )
+      // Redirect non-admins away from admin area to the default events page
+      return NextResponse.redirect(new URL('/events', request.url))
+    }
+    console.log(
+      `[Middleware] Admin access granted for ${userPayload.email} to ${pathname}.`
+    )
+  }
+  // END: ADMIN ROUTE PROTECTION
+
+  console.log(`[Middleware] User authenticated: ${userPayload.email}`)
+  return NextResponse.next()
 }
 
 export const config = {
