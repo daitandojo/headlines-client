@@ -1,7 +1,8 @@
-// src/app/(main)/layout.js (version 8.2)
+// src/app/(main)/layout.js (version 9.0)
 import { getTotalArticleCount } from '@/actions/articles'
 import { getTotalEventCount } from '@/actions/events'
 import { getTotalOpportunitiesCount } from '@/actions/opportunities'
+import { getGlobalCountries } from '@/actions/countries' // <-- Import new action
 import { Providers } from '../providers'
 import { ConditionalLayout } from '@/components/ConditionalLayout'
 
@@ -11,17 +12,21 @@ import { ConditionalLayout } from '@/components/ConditionalLayout'
  * client component, which can react to the current route.
  */
 export default async function MainLayout({ children }) {
-  // Fetch all data required for the Header.
-  const [articleCount, eventCount, opportunityCount] = await Promise.all([
-    getTotalArticleCount(),
-    getTotalEventCount(),
-    getTotalOpportunitiesCount(),
-  ])
+  // Fetch all data required for the Header and global components.
+  const [articleCount, eventCount, opportunityCount, globalCountries] = await Promise.all(
+    [
+      getTotalArticleCount(),
+      getTotalEventCount(),
+      getTotalOpportunitiesCount(),
+      getGlobalCountries(), // <-- Fetch global countries
+    ]
+  )
 
   const layoutProps = {
     articleCount,
     eventCount,
     opportunityCount,
+    globalCountries, // <-- Pass down to client
   }
 
   return (

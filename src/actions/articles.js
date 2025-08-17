@@ -1,4 +1,4 @@
-// src/actions/articles.js (version 2.1)
+// src/actions/articles.js (version 4.0)
 'use server'
 
 import dbConnect from '@/lib/mongodb'
@@ -30,22 +30,27 @@ export async function deleteArticle(articleId) {
 export async function getArticles({ page = 1, filters = {}, sort = 'date_desc' }) {
   await dbConnect()
 
-  const queryFilter = {
-    $or: [{ relevance_article: { $gt: 25 } }, { relevance_headline: { $gt: 25 } }],
-  }
+  const andConditions = [
+    { $or: [{ relevance_article: { $gt: 25 } }, { relevance_headline: { $gt: 25 } }] },
+  ]
 
   if (filters.q) {
     const searchRegex = { $regex: filters.q, $options: 'i' }
-    queryFilter.$or.push(
-      { headline: searchRegex },
-      { headline_en: searchRegex },
-      { assessment_article: searchRegex },
-      { 'key_individuals.name': searchRegex }
-    )
+    andConditions.push({
+      $or: [
+        { headline: searchRegex },
+        { headline_en: searchRegex },
+        { assessment_article: searchRegex },
+        { 'key_individuals.name': searchRegex },
+      ],
+    })
   }
-  if (filters.country) {
-    queryFilter.country = filters.country
+  if (filters.country && filters.country.length > 0) {
+    andConditions.push({ country: { $in: filters.country } })
   }
+
+  const queryFilter =
+    andConditions.length > 1 ? { $and: andConditions } : andConditions[0] || {}
 
   const sortOptions = {}
   if (sort === 'date_asc') sortOptions.createdAt = 1
@@ -64,13 +69,33 @@ export async function getArticles({ page = 1, filters = {}, sort = 'date_desc' }
 }
 
 /**
- * Gets the total count of relevant articles for header stats.
+ * Gets the total count of relevant articles, optionally filtered.
  * @returns {Promise<number>} The total number of relevant articles.
  */
-export async function getTotalArticleCount() {
+export async function getTotalArticleCount({ filters = {} } = {}) {
   await dbConnect()
-  const count = await Article.countDocuments({
-    $or: [{ relevance_article: { $gt: 25 } }, { relevance_headline: { $gt: 25 } }],
-  })
+
+  const andConditions = [
+    { $or: [{ relevance_article: { $gt: 25 } }, { relevance_headline: { $gt: 25 } }] },
+  ]
+
+  if (filters.q) {
+    const searchRegex = { $regex: filters.q, $options: 'i' }
+    andConditions.push({
+      $or: [
+        { headline: searchRegex },
+        { headline_en: searchRegex },
+        { assessment_article: searchRegex },
+        { 'key_individuals.name': searchRegex },
+      ],
+    })
+  }
+  if (filters.country && filters.country.length > 0) {
+    andConditions.push({ country: { $in: filters.country } })
+  }
+
+  const queryFilter =
+    andConditions.length > 1 ? { $and: andConditions } : andConditions[0] || {}
+  const count = await Article.countDocuments(queryFilter)
   return count
 }

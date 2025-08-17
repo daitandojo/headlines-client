@@ -1,16 +1,49 @@
-// src/components/Header.jsx (version 1.5)
+// src/components/Header.jsx (version 4.0)
 'use client'
 
-import { Briefcase } from 'lucide-react'
+import { Briefcase, LogOut } from 'lucide-react'
 import { InstallPwaButton } from '@/components/InstallPwaButton'
-import { PushNotificationManager } from '@/components/PushNotificationManager'
+import { GlobalCountrySelector } from './GlobalCountrySelector'
+import { useAuth } from '@/hooks/useAuth'
+import { Button } from './ui/button'
+import { NotificationToggles } from './NotificationToggles'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
-export const Header = ({ articleCount, eventCount, opportunityCount }) => {
+export const Header = ({
+  articleCount,
+  eventCount,
+  opportunityCount,
+  globalCountries,
+}) => {
+  const { user, logout } = useAuth()
+
   return (
     <header className="mb-4 sm:mb-6 relative">
       <div className="absolute top-2 right-2 flex items-center gap-1">
+        {user && (
+          <>
+            <GlobalCountrySelector countries={globalCountries || []} />
+            <NotificationToggles />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={logout}>
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Log Out</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
+        )}
         <InstallPwaButton />
-        <PushNotificationManager />
       </div>
 
       <div className="flex flex-row items-center justify-center gap-x-3 sm:gap-x-4 mb-3 pt-8 sm:pt-0">

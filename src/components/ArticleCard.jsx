@@ -1,23 +1,12 @@
-// src/components/ArticleCard.jsx (version 7.4)
+// src/components/ArticleCard.jsx (version 8.0)
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -29,6 +18,8 @@ import {
 import { Trash2, ExternalLink, Users, Mail, Building, Briefcase } from 'lucide-react'
 import { getCountryFlag } from '@/lib/countries'
 import { SwipeToDelete } from './swipe/SwipeToDelete'
+import { DeletionConfirmationDialog } from './DeletionConfirmationDialog' // <-- Import new dialog
+import useAppStore from '@/store/use-app-store' // <-- Import store
 
 const getRelevanceBadgeClass = (score) => {
   if (score >= 90)
@@ -40,11 +31,24 @@ const getRelevanceBadgeClass = (score) => {
 
 export const ArticleCard = ({ article, onDelete }) => {
   const [isPending, startTransition] = useTransition()
+  const [isDialogOpen, setIsDialogOpen] = useState(false) // <-- State for dialog
+  const skipConfirmation = useAppStore(
+    (state) => state.deletePreferences.skipArticleConfirmation
+  ) // <-- Get preference from store
 
   const handleDelete = () => {
     startTransition(() => {
       onDelete()
     })
+  }
+
+  const handleDeleteClick = (e) => {
+    e.stopPropagation()
+    if (skipConfirmation) {
+      handleDelete()
+    } else {
+      setIsDialogOpen(true)
+    }
   }
 
   const flag = getCountryFlag(article.country)
@@ -88,39 +92,20 @@ export const ArticleCard = ({ article, onDelete }) => {
                     </TooltipTrigger>
                     <TooltipContent>Open in new tab</TooltipContent>
                   </Tooltip>
-                  <AlertDialog>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={isPending}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Delete article</TooltipContent>
-                    </Tooltip>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently delete the article:{' '}
-                          <span className="font-semibold italic">
-                            "{article.headline_en || article.headline}"
-                          </span>
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete}>
-                          Continue
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={isPending}
+                        onClick={handleDeleteClick}
+                        className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete article</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
 
@@ -186,6 +171,17 @@ export const ArticleCard = ({ article, onDelete }) => {
           </div>
         </AccordionContent>
       </AccordionItem>
+
+      {/* Replace old AlertDialog with the new reusable one */}
+      <DeletionConfirmationDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onConfirm={handleDelete}
+        isPending={isPending}
+        itemType="article"
+        itemDescription={article.headline_en || article.headline}
+        preferenceKey="skipArticleConfirmation"
+      />
     </div>
   )
 }

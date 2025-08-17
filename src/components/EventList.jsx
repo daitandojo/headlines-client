@@ -1,4 +1,4 @@
-// src/components/EventList.jsx (version 4.1)
+// src/components/EventList.jsx (version 4.2)
 import { Accordion } from '@/components/ui/accordion'
 import { SynthesizedEventCard } from '@/components/SynthesizedEventCard'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -22,12 +22,13 @@ export const EventList = ({ events, onDelete }) => {
                 whileTap={{ scale: 0.98 }}
                 className={cn(
                   'rounded-xl bg-gradient-to-br from-slate-900 to-slate-800/60 shadow-lg shadow-black/40 border border-slate-700',
-                  isHighRelevance && 'card-glow impatient-wobble'
+                  isHighRelevance && 'card-glow impatient-wobble',
+                  'min-w-full sm:min-w-[480px]' // <-- ADDED MINIMUM WIDTH
                 )}
               >
                 <SynthesizedEventCard
                   event={event}
-                  onDelete={() => onDelete(event._id)}
+                  onDelete={() => onDelete({ eventId: event._id })}
                 />
               </motion.div>
             )

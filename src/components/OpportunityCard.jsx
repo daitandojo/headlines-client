@@ -1,20 +1,9 @@
-// src/components/OpportunityCard.jsx (version 9.0)
+// src/components/OpportunityCard.jsx (version 10.0)
 'use client'
 
 import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import {
   Tooltip,
   TooltipContent,
@@ -25,18 +14,33 @@ import { ExternalLink, User, Briefcase, MapPin, Trash2, Mail, Zap } from 'lucide
 import { Badge } from '@/components/ui/badge'
 import { SwipeToDelete } from './swipe/SwipeToDelete'
 import { cn } from '@/lib/utils'
-import { EventContextDialog } from './EventContextDialog' // <-- IMPORT NEW DIALOG
+import { EventContextDialog } from './EventContextDialog'
+import { DeletionConfirmationDialog } from './DeletionConfirmationDialog' // <-- Import new dialog
+import useAppStore from '@/store/use-app-store' // <-- Import store
 
 export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
-  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false) // <-- STATE FOR DIALOG
+  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false) // <-- State for delete dialog
+  const skipConfirmation = useAppStore(
+    (state) => state.deletePreferences.skipOpportunityConfirmation
+  ) // <-- Get preference from store
 
   const handleDelete = (e) => {
     if (e) e.preventDefault()
     onDelete()
   }
 
+  const handleDeleteClick = (e) => {
+    e.stopPropagation()
+    if (skipConfirmation) {
+      handleDelete(e)
+    } else {
+      setIsDeleteDialogOpen(true)
+    }
+  }
+
   const sourceArticle = opportunity.sourceArticleId
-  const sourceEvent = opportunity.sourceEventId // <-- GET POPULATED EVENT
+  const sourceEvent = opportunity.sourceEventId
   const { contactDetails } = opportunity
   const isPremiumOpportunity = opportunity.likelyMMDollarWealth > 49
 
@@ -90,40 +94,22 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
                       <p>View Source Article</p>
                     </TooltipContent>
                   </Tooltip>
-                  <AlertDialog>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            disabled={isDeleting}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-400" />
-                          </Button>
-                        </AlertDialogTrigger>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Delete Opportunity</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete}>
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={isDeleting}
+                        onClick={handleDeleteClick}
+                      >
+                        <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-400" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Delete Opportunity</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </TooltipProvider>
               </div>
             </div>
@@ -154,7 +140,7 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
               </p>
             </div>
 
-            {/* START: NEW EVENT CONTEXT SECTION */}
+            {/* Event context section */}
             {sourceEvent && (
               <div className="pt-3 mt-3 border-t border-slate-700/50">
                 <Button
@@ -172,12 +158,11 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
                 </Button>
               </div>
             )}
-            {/* END: NEW EVENT CONTEXT SECTION */}
           </CardContent>
         </SwipeToDelete>
       </Card>
 
-      {/* RENDER THE DIALOG */}
+      {/* RENDER THE DIALOGS */}
       {sourceEvent && (
         <EventContextDialog
           event={sourceEvent}
@@ -185,6 +170,15 @@ export function OpportunityCard({ opportunity, onDelete, isDeleting }) {
           onOpenChange={setIsEventDialogOpen}
         />
       )}
+      <DeletionConfirmationDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={handleDelete}
+        isPending={isDeleting}
+        itemType="opportunity"
+        itemDescription={`for ${opportunity.reachOutTo}`}
+        preferenceKey="skipOpportunityConfirmation"
+      />
     </>
   )
 }

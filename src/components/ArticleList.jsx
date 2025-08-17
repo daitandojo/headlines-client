@@ -1,4 +1,4 @@
-// src/components/ArticleList.jsx (version 4.1)
+// src/components/ArticleList.jsx (version 4.2)
 import { Accordion } from '@/components/ui/accordion'
 import { ArticleCard } from '@/components/ArticleCard'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -23,7 +23,8 @@ export const ArticleList = ({ articles, onDelete }) => {
                 whileTap={{ scale: 0.98 }}
                 className={cn(
                   'rounded-xl bg-gradient-to-br from-slate-900 to-slate-800/60 shadow-lg shadow-black/40 border border-slate-700',
-                  isHighRelevance && 'card-glow impatient-wobble'
+                  isHighRelevance && 'card-glow impatient-wobble',
+                  'min-w-full sm:min-w-[480px]' // <-- ADDED MINIMUM WIDTH
                 )}
               >
                 <ArticleCard article={article} onDelete={() => onDelete(article._id)} />

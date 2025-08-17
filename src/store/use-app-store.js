@@ -1,4 +1,4 @@
-// src/store/use-app-store.js (version 4.0)
+// src/store/use-app-store.js (version 7.0)
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
@@ -11,7 +11,15 @@ const useAppStore = create(
       allMessages: {},
       chatContextPrompt: '',
 
-      // --- Chat Actions ---
+      // --- Deletion Preferences ---
+      deletePreferences: {
+        skipArticleConfirmation: false,
+        skipOpportunityConfirmation: false,
+      },
+
+      // REMOVED: The globalCountryFilter is now managed by AuthContext to prevent state desync.
+
+      // --- Actions ---
       setChatContextPrompt: (prompt) => set({ chatContextPrompt: prompt }),
       createChat: () => {
         const newChatId = `chat_${Date.now()}`
@@ -56,16 +64,26 @@ const useAppStore = create(
           selectChat(chats[0].id)
         }
       },
+      setDeletePreference: (key, value) => {
+        set((state) => ({
+          deletePreferences: {
+            ...state.deletePreferences,
+            [key]: value,
+          },
+        }))
+        console.log(`[Store] Set delete preference: ${key} = ${value}`)
+      },
+      // REMOVED: The action for globalCountryFilter is no longer needed.
     }),
     {
       name: 'headlines-app-storage',
       storage: createJSONStorage(() => localStorage),
-      // Only persist chat data to local storage.
-      // Server data is now handled by TanStack Query.
       partialize: (state) => ({
         chats: state.chats,
         activeChatId: state.activeChatId,
         allMessages: state.allMessages,
+        deletePreferences: state.deletePreferences,
+        // REMOVED: globalCountryFilter is no longer persisted here.
       }),
     }
   )

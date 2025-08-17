@@ -1,43 +1,25 @@
-// src/app/(main)/articles/page.js (version 2.2)
-import { Suspense } from 'react'
-import { ArticlesView } from '@/components/ArticlesView'
-import { GlobalFilters } from '@/components/GlobalFilters'
-import { ARTICLES_PER_PAGE } from '@/config/constants'
-import dbConnect from '@/lib/mongodb'
-import Article from '@/models/Article'
-import { getArticles } from '@/actions/articles'
-import { LoadingOverlay } from '@/components/LoadingOverlay'
+// src/app/(main)/articles/page.js (version 9.1)
+import { DataView } from '@/components/DataView'
+import { getArticles } from '@/actions/articles' // <-- Import getArticles
+import { ArticleListWrapper } from '@/components/ArticleListWrapper'
 
-async function getData(searchParams) {
-  await dbConnect()
-  const query = {
-    country: { $ne: null },
-    $or: [{ relevance_article: { $gt: 25 } }, { relevance_headline: { $gt: 25 } }],
-  }
+const sortOptions = [
+  { value: 'date_desc', icon: 'clock', tooltip: 'Sort by Date (Newest First)' },
+  { value: 'relevance_desc', icon: 'relevance', tooltip: 'Sort by Relevance' },
+]
 
-  const uniqueCountriesPromise = Article.distinct('country', query)
-  const initialArticlesPromise = getArticles({
-    page: 1,
-    filters: { q: searchParams.q, country: searchParams.country },
-    sort: searchParams.sort,
-  })
-
-  const [uniqueCountries, initialArticles] = await Promise.all([
-    uniqueCountriesPromise,
-    initialArticlesPromise,
-  ])
-  return { uniqueCountries, initialArticles }
-}
-
-export default async function ArticlesPage({ searchParams }) {
-  const { uniqueCountries, initialArticles } = await getData(searchParams)
+export default async function ArticlesPage() {
+  // Re-instated server-side fetch for initial data
+  const initialArticles = await getArticles({ page: 1 })
 
   return (
-    <>
-      <GlobalFilters uniqueCountries={uniqueCountries} />
-      <Suspense fallback={<LoadingOverlay isLoading={true} text="Loading Articles..." />}>
-        <ArticlesView initialArticles={initialArticles} searchParams={searchParams} />
-      </Suspense>
-    </>
+    <DataView
+      viewTitle="Raw Articles"
+      baseSubtitle="articles"
+      sortOptions={sortOptions}
+      queryKeyPrefix="articles"
+      ListComponent={ArticleListWrapper}
+      initialData={initialArticles} // <-- Pass initial data as a prop
+    />
   )
 }

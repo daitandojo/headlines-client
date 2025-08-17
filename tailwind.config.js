@@ -1,3 +1,4 @@
+// tailwind.config.js (version 1.1)
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ['class'],
@@ -46,6 +47,28 @@ module.exports = {
           '0%, 100%': { opacity: 1, transform: 'scale(1)' },
           '50%': { opacity: 0.7, transform: 'scale(0.95)' },
         },
+        // START: ADDED NEW "COMET" ANIMATION
+        'comet-in': {
+          '0%': {
+            opacity: '0',
+            transform: 'translateX(50%) translateY(-50%) scale(0.5) rotate(-15deg)',
+          },
+          '100%': {
+            opacity: '1',
+            transform: 'translateX(-50%) translateY(-50%) scale(1) rotate(0deg)',
+          },
+        },
+        'comet-out': {
+          '0%': {
+            opacity: '1',
+            transform: 'translateX(-50%) translateY(-50%) scale(1) rotate(0deg)',
+          },
+          '100%': {
+            opacity: '0',
+            transform: 'translateX(-150%) translateY(50%) scale(0.5) rotate(15deg)',
+          },
+        },
+        // END: ADDED NEW "COMET" ANIMATION
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -53,6 +76,10 @@ module.exports = {
         'fade-in-up': 'fade-in-up 0.5s ease-out forwards',
         shake: 'shake 0.5s ease-in-out',
         pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        // START: ADDED NEW "COMET" ANIMATION
+        'comet-in': 'comet-in 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
+        'comet-out': 'comet-out 0.4s ease-in',
+        // END: ADDED NEW "COMET" ANIMATION
       },
     },
   },

@@ -1,9 +1,10 @@
-// src/app/providers.jsx (version 1.0)
+// src/app/providers.jsx (version 1.1)
 'use client'
 
 import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+// REMOVED: The devtools import is the source of the error.
+// import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
 export function Providers({ children }) {
   // Using useState ensures that QueryClient is only created once per component lifecycle,
@@ -13,7 +14,8 @@ export function Providers({ children }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      <ReactQueryDevtools initialIsOpen={false} />
+      {/* REMOVED: The ReactQueryDevtools component is causing a critical ChunkLoadError. */}
+      {/* <ReactQueryDevtools initialIsOpen={false} /> */}
     </QueryClientProvider>
   )
 }

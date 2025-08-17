@@ -1,47 +1,32 @@
-// src/app/(main)/opportunities/page.js (version 8.2)
-import { Suspense } from 'react'
-import { OpportunitiesView } from '@/components/OpportunitiesView'
-import {
-  getOpportunities,
-  getOpportunityCountries,
-  getTotalOpportunitiesCount,
-} from '@/actions/opportunities'
-import { SkeletonCard } from '@/components/SkeletonCard'
-import { OPPORTUNITIES_PER_PAGE } from '@/config/constants'
+// src/app/(main)/opportunities/page.js (version 14.1)
+import { DataView } from '@/components/DataView'
+import { getOpportunities } from '@/actions/opportunities' // <-- Import getOpportunities
+import { OpportunityListWrapper } from '@/components/OpportunityListWrapper'
 
 export const metadata = {
   title: 'Opportunities | Headlines',
   description: 'Manage and track wealth management opportunities.',
 }
 
-export default async function OpportunitiesPage({ searchParams }) {
-  const filters = { country: searchParams.country }
+const sortOptions = [
+  { value: 'date_desc', icon: 'clock', tooltip: 'Sort by Date (Newest First)' },
+  { value: 'size_desc', icon: 'size', tooltip: 'Sort by Estimated Size' },
+]
 
-  const [initialOpportunities, uniqueCountries, totalOpportunitiesCount] =
-    await Promise.all([
-      getOpportunities({ page: 1, filters }),
-      getOpportunityCountries(),
-      getTotalOpportunitiesCount({ filters }),
-    ])
+export default async function OpportunitiesPage() {
+  // Re-instated server-side fetch for initial data
+  const initialOpportunities = await getOpportunities({ page: 1 })
 
   return (
     <div className="max-w-5xl mx-auto w-full">
-      <Suspense fallback={<SkeletonLoader count={OPPORTUNITIES_PER_PAGE} />}>
-        <OpportunitiesView
-          initialOpportunities={initialOpportunities}
-          uniqueCountries={uniqueCountries}
-          totalCount={totalOpportunitiesCount}
-          searchParams={searchParams}
-        />
-      </Suspense>
+      <DataView
+        viewTitle="Actionable Opportunities"
+        baseSubtitle="opportunities"
+        sortOptions={sortOptions}
+        queryKeyPrefix="opportunities"
+        ListComponent={OpportunityListWrapper}
+        initialData={initialOpportunities} // <-- Pass initial data as a prop
+      />
     </div>
   )
 }
-
-const SkeletonLoader = ({ count }) => (
-  <div className="max-w-5xl mx-auto space-y-4 px-4 sm:px-0">
-    {Array.from({ length: count }).map((_, i) => (
-      <SkeletonCard key={i} />
-    ))}
-  </div>
-)

@@ -1,4 +1,4 @@
-// src/components/SplashScreen.jsx (version 1.0)
+// src/components/SplashScreen.jsx (version 2.0)
 'use client'
 
 import { motion } from 'framer-motion'
@@ -40,7 +40,7 @@ const wooshVariants = {
   },
 }
 
-const iconVariants = {
+const textVariants = {
   initial: {
     scale: 0.8,
     opacity: 0,
@@ -67,35 +67,41 @@ export function SplashScreen() {
       exit="exit"
       className="fixed inset-0 z-50 flex items-center justify-center bg-[hsl(224,71.4%,4.1%)]"
     >
-      <div className="relative flex items-center justify-center w-64 h-64">
-        {/* The "Woosh" Animation Layers */}
-        <motion.div
-          variants={wooshContainerVariants}
-          initial="initial"
-          animate="animate"
-          className="absolute inset-0"
+      <div className="relative flex flex-col items-center justify-center w-64 h-64">
+        <div className="relative flex items-center justify-center w-32 h-32">
+          {/* The "Woosh" Animation Layers */}
+          <motion.div
+            variants={wooshContainerVariants}
+            initial="initial"
+            animate="animate"
+            className="absolute inset-0"
+          >
+            {[...Array(wooshLayers)].map((_, i) => (
+              <motion.div
+                key={i}
+                variants={wooshVariants}
+                className="absolute inset-0 border-2 border-blue-400/50"
+                style={{
+                  transformOrigin: 'center',
+                  width: `${100 - i * 15}%`,
+                  height: `${100 - i * 15}%`,
+                  top: `${(i * 15) / 2}%`,
+                  left: `${(i * 15) / 2}%`,
+                }}
+              />
+            ))}
+          </motion.div>
+          {/* The Central Icon */}
+          <motion.div variants={textVariants}>
+            <Briefcase size={48} className="text-blue-300" />
+          </motion.div>
+        </div>
+        <motion.h1
+          variants={textVariants}
+          className="mt-6 text-3xl font-bold text-slate-200"
         >
-          {[...Array(wooshLayers)].map((_, i) => (
-            <motion.div
-              key={i}
-              variants={wooshVariants}
-              className="absolute inset-0 border-2 border-blue-400/50"
-              style={{
-                transformOrigin: 'center',
-                // Make each subsequent layer slightly smaller
-                width: `${100 - i * 15}%`,
-                height: `${100 - i * 15}%`,
-                top: `${(i * 15) / 2}%`,
-                left: `${(i * 15) / 2}%`,
-              }}
-            />
-          ))}
-        </motion.div>
-
-        {/* The Central Icon */}
-        <motion.div variants={iconVariants}>
-          <Briefcase size={48} className="text-blue-300" />
-        </motion.div>
+          Headlines
+        </motion.h1>
       </div>
     </motion.div>
   )

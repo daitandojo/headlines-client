@@ -1,4 +1,4 @@
-// src/lib/env.mjs (version 2.0)
+// src/lib/env.mjs (version 3.1)
 import { z } from 'zod'
 
 /**
@@ -11,10 +11,12 @@ const envSchema = z.object({
   MONGO_URI: z.string().url({ message: 'MONGO_URI must be a valid URL.' }),
 
   // Authentication
-  LOGIN_PASSWORD: z.string().min(1, { message: 'LOGIN_PASSWORD is required.' }),
   COOKIE_SECRET: z
     .string()
-    .min(10, { message: 'COOKIE_SECRET must be at least 10 characters long.' }),
+    .min(10, { message: 'COOKIE_SECRET must be at least 10 characters long.' }), // Note: This will be deprecated
+  JWT_SECRET: z
+    .string()
+    .min(32, { message: 'JWT_SECRET must be at least 32 characters long for security.' }),
 
   // Third-Party Services
   GROQ_API_KEY: z.string().min(1, { message: 'GROQ_API_KEY is required.' }),
@@ -43,33 +45,24 @@ const envSchema = z.object({
   ),
 })
 
-/**
- * A pre-validated and typed environment object.
- *
- * This object is created by parsing `process.env` with our Zod schema.
- * If any environment variables are missing or invalid, the build process
- * will fail with a clear and helpful error message.
- *
- * All server-side code should import this `env` object instead of accessing
- * `process.env` directly.
- */
 let env
 
 try {
   env = envSchema.parse(process.env)
 } catch (error) {
   if (error instanceof z.ZodError) {
-    console.error(
+    let errorMessage =
       '\n\n\x1b[31mCRITICAL ERROR: Invalid or missing environment variables:\x1b[0m\n'
-    )
     error.errors.forEach((e) => {
-      console.error(`  - \x1b[33m${e.path.join('.')}:\x1b[0m \x1b[31m${e.message}\x1b[0m`)
+      errorMessage += `  - \x1b[33m${e.path.join('.')}:\x1b[0m \x1b[31m${e.message}\x1b[0m\n`
     })
-    console.error(
+    errorMessage +=
       '\n\x1b[32mACTION REQUIRED: Please check your .env.local file and ensure all required variables are set correctly.\x1b[0m\n'
-    )
-    // Exit the process with an error code to halt the build/start.
-    process.exit(1)
+
+    // START: REPLACED process.exit WITH A THROWN ERROR
+    // This stops the build/server start in a runtime-agnostic way.
+    throw new Error(errorMessage)
+    // END: REPLACED process.exit
   }
   // Re-throw other unexpected errors
   throw error

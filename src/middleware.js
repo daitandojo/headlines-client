@@ -1,53 +1,54 @@
-import { NextResponse } from 'next/server';
+// src/middleware.js (version 2.0)
+import { NextResponse } from 'next/server'
+import * as jose from 'jose'
+import { env } from '@/lib/env.mjs'
 
-const COOKIE_NAME = 'headlines-auth';
-const COOKIE_SECRET = process.env.COOKIE_SECRET || 'default-secret-for-dev-please-change-in-production';
+const JWT_COOKIE_NAME = 'headlines-jwt'
 
-export function middleware(request) {
-    const { pathname } = request.nextUrl;
-    
-    // Log every request the middleware is running for.
-    // This will show up in your `npm run dev` terminal.
-    console.log(`[Middleware] Checking path: ${pathname}`);
-
-    // Define paths that should NOT be protected by the password.
-    const publicPaths = [
-        '/login',
-        // Add any other public paths here, e.g., '/about', '/privacy'
-    ];
-
-    // Check if the current path is one of the public paths.
-    // We also exclude Next.js internal paths and API routes.
-    if (
-        publicPaths.includes(pathname) || 
-        pathname.startsWith('/_next/') || 
-        pathname.startsWith('/api/') ||
-        pathname.includes('/favicon.ico')
-    ) {
-        // If it's a public path, do nothing and let the request continue.
-        console.log(`[Middleware] Path is public. Allowing access.`);
-        return NextResponse.next();
-    }
-    
-    // --- If the path is NOT public, proceed with authentication check ---
-    
-    const authCookie = request.cookies.get(COOKIE_NAME);
-    const isAuthenticated = authCookie && authCookie.value === COOKIE_SECRET;
-
-    if (isAuthenticated) {
-        // User has the correct cookie. Allow them to proceed to the protected page.
-        console.log(`[Middleware] User is authenticated. Allowing access.`);
-        return NextResponse.next();
-    }
-
-    // User is not authenticated. Redirect them to the login page.
-    console.log(`[Middleware] User is NOT authenticated. Redirecting to /login.`);
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
+async function verifyToken(token) {
+  if (!token) return null
+  try {
+    const secret = new TextEncoder().encode(env.JWT_SECRET)
+    const { payload } = await jose.jwtVerify(token, secret)
+    return payload
+  } catch (e) {
+    console.warn('[Middleware] JWT verification failed:', e.message)
+    return null
+  }
 }
 
-// A simple, broad matcher to ensure the middleware runs on EVERY request.
-// The logic inside the function will then decide which paths are public.
+export async function middleware(request) {
+  const { pathname } = request.nextUrl
+  console.log(`[Middleware] Checking path: ${pathname}`)
+
+  const publicPaths = ['/login']
+
+  if (
+    publicPaths.includes(pathname) ||
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/api/') || // API routes have their own auth checks
+    pathname.includes('/icons/') ||
+    pathname.includes('/manifest.json') ||
+    pathname.includes('/favicon.ico')
+  ) {
+    return NextResponse.next()
+  }
+
+  const token = request.cookies.get(JWT_COOKIE_NAME)?.value
+  const userPayload = await verifyToken(token)
+
+  if (userPayload) {
+    console.log(`[Middleware] User authenticated: ${userPayload.email}`)
+    return NextResponse.next()
+  }
+
+  console.log(`[Middleware] User not authenticated. Redirecting to /login.`)
+  const loginUrl = new URL('/login', request.url)
+  // Pass the intended destination for a better user experience after login
+  loginUrl.searchParams.set('from', pathname)
+  return NextResponse.redirect(loginUrl)
+}
+
 export const config = {
-  matcher: '/:path*',
-};
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|sw.js).*)'],
+}
